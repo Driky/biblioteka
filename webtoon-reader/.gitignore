@@ -1,0 +1,48 @@
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+/shared/deps/
+/phoenix_app/deps/
+/scraper/deps/
+
+# Build artifacts
+/shared/_build/
+/phoenix_app/_build/
+/scraper/_build/
+
+# Generated files
+/phoenix_app/priv/static/assets/
+*.ez
+*.beam
+
+# Node modules
+/phoenix_app/assets/node_modules/
+
+# Test coverage
+/cover/
+
+# Database files
+*.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Elixir release
+/phoenix_app/rel/
+/scraper/rel/
+
+# Erlang crash dumps
+erl_crash.dump
+
+# Static digested files
+/phoenix_app/priv/static/cache_manifest.json
