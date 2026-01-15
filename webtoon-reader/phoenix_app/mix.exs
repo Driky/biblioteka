@@ -5,7 +5,7 @@ defmodule WebtoonWeb.MixProject do
     [
       app: :webtoon_web,
       version: "0.1.0",
-      elixir: "~> 1.14",
+      elixir: "~> 1.19",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
@@ -29,10 +29,10 @@ defmodule WebtoonWeb.MixProject do
       {:webtoon_shared, path: "../shared"},
 
       # Phoenix
-      {:phoenix, "~> 1.7"},
-      {:phoenix_html, "~> 4.0"},
-      {:phoenix_live_reload, "~> 1.4", only: :dev},
-      {:phoenix_live_view, "~> 0.20"},
+      {:phoenix, "~> 1.8"},
+      {:phoenix_html, "~> 4.2"},
+      {:phoenix_live_reload, "~> 1.5", only: :dev},
+      {:phoenix_live_view, "~> 1.0"},
       {:phoenix_live_dashboard, "~> 0.8"},
 
       # Assets
