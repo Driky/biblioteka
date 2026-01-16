@@ -20,7 +20,9 @@ services:
       retries: 5
 
   render-server:
-    image: ghcr.io/elixir-crawly/crawly-render-server:latest
+    build:
+      context: ./render-server
+      dockerfile: Dockerfile
     container_name: webtoon_render
     networks:
       - internal

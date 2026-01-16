@@ -125,17 +125,25 @@ Visit http://localhost:4000
 The scraper requires a render server (headless Chrome) for JavaScript-rendered sites:
 
 ```bash
-# Start the render server
+# Build and start the render server from local Dockerfile
+cd render-server
+docker build -t crawly-render-server .
 docker run -d \
   --name crawly_render \
   -p 3000:3000 \
-  ghcr.io/elixir-crawly/crawly-render-server:latest
+  crawly-render-server
 
 # Start the scraper
-cd scraper
+cd ../scraper
 export DATABASE_URL=ecto://postgres:postgres@localhost/webtoon_dev
 export RENDER_SERVER_URL=http://localhost:3000/render
 iex -S mix
+```
+
+Alternatively, use Docker Compose to start all services including the render server:
+
+```bash
+docker compose up -d render-server
 ```
 
 ### 6. Running Tests
