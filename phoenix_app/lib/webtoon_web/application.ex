@@ -6,7 +6,7 @@ defmodule WebtoonWeb.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      WebtoonShared.Repo,
+      # Repo is started by WebtoonShared.Application
       WebtoonWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:webtoon_web, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: WebtoonWeb.PubSub},

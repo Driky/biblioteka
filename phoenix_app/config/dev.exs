@@ -42,9 +42,6 @@ config :webtoon_web, WebtoonWeb.Endpoint,
 # Enable dev routes
 config :webtoon_web, dev_routes: true
 
-# Disable swoosh api client
-config :swoosh, :api_client, false
-
 # Set a higher stacktrace during development
 config :phoenix, :stacktrace_depth, 20
 
