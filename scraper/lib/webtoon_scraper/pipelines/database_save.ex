@@ -9,7 +9,7 @@ defmodule WebtoonScraper.Pipelines.DatabaseSave do
   require Logger
 
   alias WebtoonShared.Repo
-  alias WebtoonShared.Schema.{Chapter, ChapterImage}
+  alias WebtoonShared.Schema.{Chapter, ChapterImage, Webtoon}
   alias WebtoonScraper.Sources
 
   @impl Crawly.Pipeline
@@ -18,8 +18,42 @@ defmodule WebtoonScraper.Pipelines.DatabaseSave do
       %{type: :chapter} ->
         save_chapter(item, state)
 
+      %{type: :cover} ->
+        save_cover(item, state)
+
       _ ->
         {item, state}
+    end
+  end
+
+  defp save_cover(item, state) do
+    %{
+      webtoon_id: webtoon_id,
+      storage_path: storage_path
+    } = item
+
+    # Build the public URL for the cover
+    public_url = Application.get_env(:webtoon_shared, :r2_public_url, "")
+    cover_url = "#{public_url}/#{storage_path}"
+
+    case Repo.get(Webtoon, webtoon_id) do
+      nil ->
+        Logger.error("Webtoon #{webtoon_id} not found, cannot save cover")
+        {false, state}
+
+      webtoon ->
+        webtoon
+        |> Webtoon.changeset(%{cover_url: cover_url})
+        |> Repo.update()
+        |> case do
+          {:ok, _} ->
+            Logger.info("Updated webtoon #{webtoon_id} cover_url to #{cover_url}")
+            {item, state}
+
+          {:error, reason} ->
+            Logger.error("Failed to update webtoon cover: #{inspect(reason)}")
+            {false, state}
+        end
     end
   end
 

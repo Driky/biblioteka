@@ -14,8 +14,58 @@ defmodule WebtoonScraper.Pipelines.ImageProcessor do
       %{type: :chapter, images: images} ->
         process_chapter_images(item, images, state)
 
+      %{type: :cover, url: url, headers: headers} ->
+        process_cover_image(item, url, headers, state)
+
       _ ->
         {item, state}
+    end
+  end
+
+  defp process_cover_image(item, url, headers, state) do
+    Logger.info("Downloading cover image: #{url}")
+
+    case download_single_image(url, headers) do
+      {:ok, image_data} ->
+        updated_item =
+          item
+          |> Map.put(:binary, image_data.binary)
+          |> Map.put(:content_type, image_data.content_type)
+          |> Map.put(:extension, image_data.extension)
+          |> Map.put(:file_size, image_data.file_size)
+
+        Logger.info("Cover image downloaded successfully (#{image_data.file_size} bytes)")
+        {updated_item, state}
+
+      {:error, reason} ->
+        Logger.error("Failed to download cover image: #{inspect(reason)}")
+        {false, state}
+    end
+  end
+
+  defp download_single_image(url, headers) do
+    req_headers =
+      headers
+      |> Enum.map(fn {k, v} -> {String.downcase(k), v} end)
+
+    case Req.get(url, headers: req_headers, receive_timeout: 30_000) do
+      {:ok, %{status: 200, body: body, headers: resp_headers}} ->
+        content_type = get_content_type(resp_headers, url)
+        extension = content_type_to_extension(content_type)
+
+        {:ok,
+         %{
+           binary: body,
+           content_type: content_type,
+           extension: extension,
+           file_size: byte_size(body)
+         }}
+
+      {:ok, %{status: status}} ->
+        {:error, "HTTP #{status}"}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

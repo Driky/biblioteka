@@ -15,6 +15,11 @@ defmodule WebtoonScraper.Spiders.Base do
           headers: [{String.t(), String.t()}]
         }
 
+  @type cover_info :: %{
+          url: String.t(),
+          headers: [{String.t(), String.t()}]
+        }
+
   @doc "Returns the site identifier (must match webtoon_sources.site_id)"
   @callback site_id() :: String.t()
 
@@ -27,10 +32,13 @@ defmodule WebtoonScraper.Spiders.Base do
   @doc "Parses image URLs from a chapter page response"
   @callback parse_chapter_images(response :: map()) :: [image_info()] | [String.t()]
 
+  @doc "Optional: Parses the cover image URL from the webtoon page response"
+  @callback parse_cover_image(response :: map()) :: cover_info() | String.t() | nil
+
   @doc "Optional: Returns custom headers for image downloads"
   @callback image_headers(image_url :: String.t()) :: [{String.t(), String.t()}]
 
-  @optional_callbacks [image_headers: 1]
+  @optional_callbacks [image_headers: 1, parse_cover_image: 1]
 
   defmacro __using__(_opts) do
     quote do
@@ -87,6 +95,9 @@ defmodule WebtoonScraper.Spiders.Base do
           "Found #{length(chapters)} chapters for #{source.webtoon && source.webtoon.title || source.source_url}"
         )
 
+        # Try to extract cover image if the callback is implemented
+        cover_item = extract_cover_image(response, source)
+
         # Filter to only new chapters (chapter_number > last_scraped)
         new_chapters =
           chapters
@@ -121,7 +132,52 @@ defmodule WebtoonScraper.Spiders.Base do
             }
           end)
 
-        %Crawly.ParsedItem{items: [], requests: requests}
+        # Include cover item if we found one and webtoon doesn't have a cover yet
+        items = if cover_item, do: [cover_item], else: []
+
+        %Crawly.ParsedItem{items: items, requests: requests}
+      end
+
+      defp extract_cover_image(response, source) do
+        # Skip if webtoon already has a cover
+        if source.webtoon && source.webtoon.cover_url do
+          Logger.debug("Webtoon already has cover, skipping cover extraction")
+          nil
+        else
+          if function_exported?(__MODULE__, :parse_cover_image, 1) do
+            case __MODULE__.parse_cover_image(response) do
+              nil ->
+                nil
+
+              %{url: url, headers: headers} when is_binary(url) ->
+                Logger.info("Found cover image: #{url}")
+                %{
+                  type: :cover,
+                  webtoon_id: source.webtoon_id,
+                  webtoon_slug: source.webtoon && source.webtoon.slug,
+                  source_id: source.id,
+                  url: url,
+                  headers: headers
+                }
+
+              url when is_binary(url) ->
+                Logger.info("Found cover image: #{url}")
+                %{
+                  type: :cover,
+                  webtoon_id: source.webtoon_id,
+                  webtoon_slug: source.webtoon && source.webtoon.slug,
+                  source_id: source.id,
+                  url: url,
+                  headers: get_image_headers(url)
+                }
+
+              _ ->
+                nil
+            end
+          else
+            nil
+          end
+        end
       end
 
       defp parse_chapter_page(response) do

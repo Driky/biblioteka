@@ -19,9 +19,10 @@ config :webtoon_shared,
 config :webtoon_scraper, WebtoonScraper.Scheduler,
   jobs: [
     {"5,35 * * * *",
-     {WebtoonScraper.Runner, :run_spider, [WebtoonScraper.Spiders.MangaDex]}}
+     {WebtoonScraper.Runner, :run_spider, [WebtoonScraper.Spiders.MangaDex]}},
+    {"15,45 * * * *",
+     {WebtoonScraper.Runner, :run_spider, [WebtoonScraper.Spiders.MangaHub]}}
     # Add more spiders with staggered times:
-    # {"15,45 * * * *", {WebtoonScraper.Runner, :run_spider, [WebtoonScraper.Spiders.WebtoonsCom]}},
     # {"25,55 * * * *", {WebtoonScraper.Runner, :run_spider, [WebtoonScraper.Spiders.AnotherSite]}},
   ]
 
