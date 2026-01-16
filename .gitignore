@@ -46,3 +46,6 @@ erl_crash.dump
 
 # Static digested files
 /phoenix_app/priv/static/cache_manifest.json
+
+# Secret
+.env.dev
