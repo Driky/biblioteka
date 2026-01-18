@@ -2,8 +2,8 @@ import Config
 
 # Database configuration (inherited from shared)
 config :webtoon_shared, WebtoonShared.Repo,
-  username: System.get_env("POSTGRES_USER", "webtoon"),
-  password: System.get_env("POSTGRES_PASSWORD", "webtoon"),
+  username: System.get_env("POSTGRES_USER", "postgres"),
+  password: System.get_env("POSTGRES_PASSWORD", "postgres"),
   hostname: System.get_env("POSTGRES_HOST", "localhost"),
   database: System.get_env("POSTGRES_DB", "webtoon_dev"),
   stacktrace: true,
