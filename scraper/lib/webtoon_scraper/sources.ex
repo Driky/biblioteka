@@ -6,7 +6,7 @@ defmodule WebtoonScraper.Sources do
 
   import Ecto.Query
   alias WebtoonShared.Repo
-  alias WebtoonShared.Schema.WebtoonSource
+  alias WebtoonShared.Schema.{Chapter, WebtoonSource}
 
   @doc """
   Gets all enabled sources for a specific site spider.
@@ -95,5 +95,17 @@ defmodule WebtoonScraper.Sources do
     source
     |> WebtoonSource.changeset(%{webtoon_id: webtoon_id})
     |> Repo.update()
+  end
+
+  @doc """
+  Gets all chapter numbers that have been successfully scraped for a webtoon.
+  Returns a MapSet of Decimal chapter numbers for efficient lookup.
+  """
+  def get_scraped_chapter_numbers(webtoon_id) do
+    Chapter
+    |> where([c], c.webtoon_id == ^webtoon_id)
+    |> select([c], c.chapter_number)
+    |> Repo.all()
+    |> MapSet.new()
   end
 end

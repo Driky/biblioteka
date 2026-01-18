@@ -82,8 +82,6 @@ defmodule WebtoonScraper.Spiders.Base do
       end
 
       defp parse_webtoon_page(response, source) do
-        # Default to -1 so that chapter 0 is included on first run
-        last_scraped = source.last_chapter_scraped || Decimal.new(-1)
         max_chapters = Application.get_env(:webtoon_scraper, :max_chapters_per_run, 20)
 
         # Parse chapter list from page
@@ -96,14 +94,18 @@ defmodule WebtoonScraper.Spiders.Base do
         # Try to extract cover image if the callback is implemented
         cover_item = extract_cover_image(response, source)
 
-        # Filter to only new chapters (chapter_number > last_scraped)
-        # For new sources, last_scraped is -1 so chapter 0 is included
-        # Sort by chapter number ascending and take only max_chapters_per_run
+        # Get already scraped chapters from DB (more reliable than tracking last_scraped)
+        # This handles gaps from failed scrapes - missing chapters will be retried
+        scraped_chapters = WebtoonScraper.Sources.get_scraped_chapter_numbers(source.webtoon_id)
+
+        Logger.debug("Already scraped #{MapSet.size(scraped_chapters)} chapters")
+
+        # Filter to chapters NOT already in DB, sort ascending, take max_chapters
         new_chapters =
           chapters
-          |> Enum.filter(fn ch ->
+          |> Enum.reject(fn ch ->
             ch_num = to_decimal(ch.chapter_number)
-            Decimal.compare(ch_num, last_scraped) == :gt
+            MapSet.member?(scraped_chapters, ch_num)
           end)
           |> Enum.sort_by(&to_decimal(&1.chapter_number))
           |> Enum.take(max_chapters)
