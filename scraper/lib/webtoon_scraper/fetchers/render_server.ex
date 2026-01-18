@@ -140,12 +140,13 @@ defmodule WebtoonScraper.Fetchers.RenderServer do
         case Jason.decode(response_body) do
           {:ok, %{"body" => html}} when is_binary(html) and html != "" ->
             Logger.info("RenderServer success for #{url}, body length: #{String.length(html)}")
-            # Return HTTPoison.Response struct - Crawly will attach the original request
+            # Include original_request so Crawly can pass options to the spider
             {:ok, %HTTPoison.Response{
               status_code: 200,
               body: html,
               headers: [],
-              request_url: url
+              request_url: url,
+              request: original_request
             }}
 
           {:ok, %{"body" => nil}} ->

@@ -211,8 +211,16 @@ defmodule WebtoonScraper.Spiders.Base do
       defp parse_chapter_page(response) do
         url = response.request_url || ""
 
-        # Get options from ETS (stored by fetcher since Crawly doesn't preserve them)
-        opts = WebtoonScraper.Fetchers.RenderServer.get_options(url)
+        # Try to get options from response.request first (standard Crawly way)
+        # Fall back to ETS if not available
+        opts =
+          case response do
+            %{request: %Crawly.Request{options: o}} when is_list(o) and o != [] -> o
+            %{request: %{options: o}} when is_list(o) and o != [] -> o
+            _ ->
+              # Fallback to ETS storage
+              WebtoonScraper.Fetchers.RenderServer.get_options(url)
+          end
 
         # Extract chapter metadata from options
         chapter_number = Keyword.get(opts, :chapter_number) || extract_chapter_number_from_url(url)
@@ -234,7 +242,7 @@ defmodule WebtoonScraper.Spiders.Base do
           "Parsing chapter #{inspect(chapter_number)} images from #{url}"
         )
         Logger.debug("Chapter metadata - webtoon_id: #{inspect(webtoon_id)}, source_id: #{inspect(source_id)}, title: #{inspect(chapter_title)}")
-        Logger.debug("Options keys from ETS: #{inspect(Keyword.keys(opts))}")
+        Logger.debug("Options keys: #{inspect(Keyword.keys(opts))}")
 
         # Parse images from page
         raw_images = parse_chapter_images(response)
