@@ -53,11 +53,13 @@ defmodule WebtoonScraper.Fetchers.RenderServer do
     if is_nil(url) do
       {:error, :invalid_request}
     else
-      do_fetch_with_retry(url, options, base_url, 0)
+      # Build a Crawly.Request to preserve options through the response
+      crawly_request = %Crawly.Request{url: url, options: options}
+      do_fetch_with_retry(url, options, base_url, crawly_request, 0)
     end
   end
 
-  defp do_fetch_with_retry(url, options, base_url, attempt) do
+  defp do_fetch_with_retry(url, options, base_url, original_request, attempt) do
     attempt_info = if attempt > 0, do: " (retry #{attempt}/#{@max_retries})", else: ""
     Logger.info("RenderServer fetching: #{url}#{attempt_info}")
 
@@ -104,33 +106,35 @@ defmodule WebtoonScraper.Fetchers.RenderServer do
         case Jason.decode(response_body) do
           {:ok, %{"body" => html}} when is_binary(html) and html != "" ->
             Logger.info("RenderServer success for #{url}, body length: #{String.length(html)}")
-            {:ok, %HTTPoison.Response{
+            # Include original request so options (chapter_title, etc.) are preserved
+            {:ok, %{
               status_code: 200,
               body: html,
               headers: [],
-              request_url: url
+              request_url: url,
+              request: original_request
             }}
 
           {:ok, %{"body" => nil}} ->
             Logger.warning("RenderServer returned null body for #{url}")
-            maybe_retry(url, options, base_url, attempt, :null_body)
+            maybe_retry(url, options, base_url, original_request, attempt, :null_body)
 
           {:ok, %{"body" => ""}} ->
             Logger.warning("RenderServer returned empty body for #{url}")
-            maybe_retry(url, options, base_url, attempt, :empty_body)
+            maybe_retry(url, options, base_url, original_request, attempt, :empty_body)
 
           {:ok, %{"error" => error}} ->
             Logger.error("Render server error for #{url}: #{error}")
-            maybe_retry(url, options, base_url, attempt, error)
+            maybe_retry(url, options, base_url, original_request, attempt, error)
 
           {:error, decode_error} ->
             Logger.error("Failed to decode render server response: #{inspect(decode_error)}")
-            maybe_retry(url, options, base_url, attempt, :decode_error)
+            maybe_retry(url, options, base_url, original_request, attempt, :decode_error)
         end
 
       {:ok, %HTTPoison.Response{status_code: status_code, body: resp_body}} when status_code in [408, 429, 500, 502, 503, 504] ->
         Logger.warning("Render server returned #{status_code} for #{url}")
-        maybe_retry(url, options, base_url, attempt, {:http_error, status_code})
+        maybe_retry(url, options, base_url, original_request, attempt, {:http_error, status_code})
 
       {:ok, %HTTPoison.Response{status_code: status_code, body: resp_body}} ->
         Logger.error("Render server returned #{status_code} for #{url}: #{String.slice(resp_body || "", 0, 200)}")
@@ -138,7 +142,7 @@ defmodule WebtoonScraper.Fetchers.RenderServer do
 
       {:error, %HTTPoison.Error{reason: reason}} when reason in [:timeout, :connect_timeout, :closed, :econnrefused] ->
         Logger.warning("RenderServer request failed (retryable) for #{url}: #{inspect(reason)}")
-        maybe_retry(url, options, base_url, attempt, reason)
+        maybe_retry(url, options, base_url, original_request, attempt, reason)
 
       {:error, %HTTPoison.Error{reason: reason}} ->
         Logger.error("RenderServer request failed for #{url}: #{inspect(reason)}")
@@ -146,14 +150,14 @@ defmodule WebtoonScraper.Fetchers.RenderServer do
     end
   end
 
-  defp maybe_retry(url, options, base_url, attempt, error) when attempt < @max_retries do
+  defp maybe_retry(url, options, base_url, original_request, attempt, error) when attempt < @max_retries do
     delay = Enum.at(@retry_delays, attempt, 8_000)
     Logger.info("RenderServer retrying #{url} in #{delay}ms (attempt #{attempt + 1}/#{@max_retries})...")
     Process.sleep(delay)
-    do_fetch_with_retry(url, options, base_url, attempt + 1)
+    do_fetch_with_retry(url, options, base_url, original_request, attempt + 1)
   end
 
-  defp maybe_retry(url, _options, _base_url, attempt, error) do
+  defp maybe_retry(url, _options, _base_url, _original_request, attempt, error) do
     Logger.error("RenderServer giving up on #{url} after #{attempt + 1} attempts, error: #{inspect(error)}")
     {:error, error}
   end
