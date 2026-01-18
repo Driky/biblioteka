@@ -75,7 +75,9 @@ defmodule WebtoonScraper.Spiders.Base do
       end
 
       defp is_chapter_page?(response) do
-        Map.has_key?(response.request.metadata || %{}, :chapter_number)
+        # Check if this is a chapter page by looking at options in the request
+        options = response.request.options || []
+        Keyword.has_key?(options, :chapter_number)
       end
 
       defp parse_webtoon_page(response, source) do
@@ -115,17 +117,17 @@ defmodule WebtoonScraper.Spiders.Base do
           Enum.map(new_chapters, fn ch ->
             request = Crawly.Utils.request_from_url(ch.url)
 
-            %{
-              request
-              | metadata: %{
-                  source_id: source.id,
-                  webtoon_id: source.webtoon_id,
-                  webtoon_slug: source.webtoon && source.webtoon.slug,
-                  chapter_number: to_decimal(ch.chapter_number),
-                  chapter_title: ch.title,
-                  source_url: ch.url
-                }
-            }
+            # Store chapter metadata in the options field
+            chapter_options = [
+              source_id: source.id,
+              webtoon_id: source.webtoon_id,
+              webtoon_slug: source.webtoon && source.webtoon.slug,
+              chapter_number: to_decimal(ch.chapter_number),
+              chapter_title: ch.title,
+              source_url: ch.url
+            ]
+
+            %{request | options: chapter_options}
           end)
 
         # Include cover item if we found one and webtoon doesn't have a cover yet
@@ -178,10 +180,17 @@ defmodule WebtoonScraper.Spiders.Base do
       end
 
       defp parse_chapter_page(response) do
-        metadata = response.request.metadata
+        # Get chapter metadata from request options
+        opts = response.request.options || []
+        chapter_number = Keyword.get(opts, :chapter_number)
+        chapter_title = Keyword.get(opts, :chapter_title)
+        source_id = Keyword.get(opts, :source_id)
+        webtoon_id = Keyword.get(opts, :webtoon_id)
+        webtoon_slug = Keyword.get(opts, :webtoon_slug)
+        source_url = Keyword.get(opts, :source_url)
 
         Logger.info(
-          "Parsing chapter #{metadata.chapter_number} images from #{response.request_url}"
+          "Parsing chapter #{chapter_number} images from #{response.request_url}"
         )
 
         # Parse images from page
@@ -205,17 +214,17 @@ defmodule WebtoonScraper.Spiders.Base do
             }
           end)
 
-        Logger.info("Found #{length(images)} images in chapter #{metadata.chapter_number}")
+        Logger.info("Found #{length(images)} images in chapter #{chapter_number}")
 
         # Create single item for the chapter with all images
         item = %{
           type: :chapter,
-          webtoon_id: metadata.webtoon_id,
-          webtoon_slug: metadata.webtoon_slug,
-          source_id: metadata.source_id,
-          chapter_number: metadata.chapter_number,
-          chapter_title: metadata.chapter_title,
-          source_url: metadata.source_url,
+          webtoon_id: webtoon_id,
+          webtoon_slug: webtoon_slug,
+          source_id: source_id,
+          chapter_number: chapter_number,
+          chapter_title: chapter_title,
+          source_url: source_url,
           images: images
         }
 
