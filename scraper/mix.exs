@@ -27,7 +27,7 @@ defmodule WebtoonScraper.MixProject do
       {:webtoon_shared, path: "../shared"},
 
       # Crawling
-      {:crawly, "~> 0.16"},
+      {:crawly, "~> 0.17"},
       {:floki, "~> 0.36"},
 
       # Scheduling

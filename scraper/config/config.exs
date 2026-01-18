@@ -11,9 +11,9 @@ config :webtoon_scraper,
 
 # Crawly configuration
 config :crawly,
-  # Fetcher configuration - use custom render server fetcher for JS-rendered pages
+  # Fetcher configuration - use CrawlyRenderServer for JS-rendered pages
   fetcher:
-    {WebtoonScraper.Fetchers.RenderServer,
+    {Crawly.Fetchers.CrawlyRenderServer,
      [
        base_url: System.get_env("RENDER_SERVER_URL", "http://localhost:3000/render")
      ]},
