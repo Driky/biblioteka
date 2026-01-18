@@ -23,8 +23,7 @@ defmodule WebtoonScraper.Spiders.Base do
   @doc "Returns the site identifier (must match webtoon_sources.site_id)"
   @callback site_id() :: String.t()
 
-  @doc "Returns the base URL for the site"
-  @callback base_url() :: String.t()
+  # Note: base_url/0 is defined by Crawly.Spider, so spiders should implement it directly
 
   @doc "Parses the chapter list from the webtoon page response"
   @callback parse_chapter_list(response :: map()) :: [chapter_info()]
@@ -32,13 +31,10 @@ defmodule WebtoonScraper.Spiders.Base do
   @doc "Parses image URLs from a chapter page response"
   @callback parse_chapter_images(response :: map()) :: [image_info()] | [String.t()]
 
-  @doc "Optional: Parses the cover image URL from the webtoon page response"
-  @callback parse_cover_image(response :: map()) :: cover_info() | String.t() | nil
-
   @doc "Optional: Returns custom headers for image downloads"
   @callback image_headers(image_url :: String.t()) :: [{String.t(), String.t()}]
 
-  @optional_callbacks [image_headers: 1, parse_cover_image: 1]
+  @optional_callbacks [image_headers: 1]
 
   defmacro __using__(_opts) do
     quote do
@@ -47,10 +43,7 @@ defmodule WebtoonScraper.Spiders.Base do
 
       require Logger
 
-      @impl Crawly.Spider
-      def base_url do
-        __MODULE__.base_url()
-      end
+      # Each spider must implement base_url/0 for Crawly.Spider
 
       @impl Crawly.Spider
       def init do
@@ -147,8 +140,9 @@ defmodule WebtoonScraper.Spiders.Base do
           Logger.debug("Webtoon already has cover, skipping cover extraction")
           nil
         else
+          # Use apply/3 to avoid compile-time warning about undefined function
           if function_exported?(__MODULE__, :parse_cover_image, 1) do
-            case __MODULE__.parse_cover_image(response) do
+            case apply(__MODULE__, :parse_cover_image, [response]) do
               nil ->
                 nil
 
@@ -229,8 +223,9 @@ defmodule WebtoonScraper.Spiders.Base do
       end
 
       defp get_image_headers(url) do
+        # Use apply/3 to avoid compile-time warning about undefined function
         if function_exported?(__MODULE__, :image_headers, 1) do
-          __MODULE__.image_headers(url)
+          apply(__MODULE__, :image_headers, [url])
         else
           [{"Referer", base_url()}]
         end

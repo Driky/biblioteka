@@ -13,10 +13,10 @@ defmodule WebtoonScraper.Spiders.MangaHub do
   @impl WebtoonScraper.Spiders.Base
   def site_id, do: "mangahub"
 
-  @impl WebtoonScraper.Spiders.Base
+  @impl Crawly.Spider
   def base_url, do: "https://mangahub.io"
 
-  @impl WebtoonScraper.Spiders.Base
+  # Optional: extracts cover image from the webtoon page
   def parse_cover_image(response) do
     {:ok, document} = Floki.parse_document(response.body)
 

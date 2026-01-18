@@ -11,7 +11,7 @@ defmodule WebtoonScraper.Spiders.MangaDex do
   @impl WebtoonScraper.Spiders.Base
   def site_id, do: "mangadex"
 
-  @impl WebtoonScraper.Spiders.Base
+  @impl Crawly.Spider
   def base_url, do: "https://mangadex.org"
 
   @impl WebtoonScraper.Spiders.Base
