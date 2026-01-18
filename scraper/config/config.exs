@@ -7,13 +7,13 @@ config :webtoon_scraper,
   ecto_repos: [WebtoonShared.Repo],
   # Maximum number of new chapters to scrape per spider run
   # This prevents overwhelming the target site and request storage
-  max_chapters_per_run: 20
+  max_chapters_per_run: 5
 
 # Crawly configuration
 config :crawly,
-  # Fetcher configuration - use CrawlyRenderServer for JS-rendered pages
+  # Fetcher configuration - use custom render server fetcher for JS-rendered pages
   fetcher:
-    {Crawly.Fetchers.CrawlyRenderServer,
+    {WebtoonScraper.Fetchers.RenderServer,
      [
        base_url: System.get_env("RENDER_SERVER_URL", "http://localhost:3000/render")
      ]},

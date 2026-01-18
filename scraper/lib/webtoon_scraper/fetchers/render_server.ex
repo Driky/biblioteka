@@ -11,20 +11,29 @@ defmodule WebtoonScraper.Fetchers.RenderServer do
   def fetch(request, client_options) do
     base_url = Keyword.get(client_options, :base_url, "http://localhost:3000/render")
 
-    # Ensure we have a valid request
+    Logger.debug("RenderServer.fetch called with request: #{inspect(request)}")
+
+    # Ensure we have a valid request - handle various input types
     url =
       case request do
+        %Crawly.Request{url: url} when is_binary(url) -> url
         %{url: url} when is_binary(url) -> url
         url when is_binary(url) -> url
+        :ok ->
+          Logger.warning("RenderServer received :ok instead of request - queue may be empty")
+          nil
+        nil ->
+          Logger.warning("RenderServer received nil request")
+          nil
         other ->
-          Logger.error("Invalid request received: #{inspect(other)}")
+          Logger.error("RenderServer received invalid request type: #{inspect(other)}")
           nil
       end
 
     if is_nil(url) do
       {:error, :invalid_request}
     else
-      Logger.debug("RenderServer fetching: #{url}")
+      Logger.info("RenderServer fetching: #{url}")
 
       # Build the render server request
       body = Jason.encode!(%{url: url, headers: format_headers(request)})
