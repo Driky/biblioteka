@@ -18,6 +18,10 @@ config :crawly,
        base_url: System.get_env("RENDER_SERVER_URL", "http://localhost:3000/render")
      ]},
 
+  # Timeout for fetch requests (milliseconds) - must be longer than render server timeout
+  # Default Crawly timeout is very short, we need longer for JS rendering
+  timeout: 120_000,
+
   # Rate limiting: keep low to avoid bans
   concurrent_requests_per_domain: 1,
 

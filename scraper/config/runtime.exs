@@ -33,11 +33,12 @@ if config_env() == :prod do
     url: env!("DATABASE_URL", :string!),
     pool_size: env!("POOL_SIZE", :integer) || 10
 
-  # Crawly render server URL
+  # Crawly render server URL - use our custom fetcher with scrolling support
   config :crawly,
     fetcher:
-      {Crawly.Fetchers.CrawlyRenderServer,
+      {WebtoonScraper.Fetchers.RenderServer,
        [
          base_url: env!("RENDER_SERVER_URL", :string!)
-       ]}
+       ]},
+    timeout: 120_000
 end

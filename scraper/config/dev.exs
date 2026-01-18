@@ -22,10 +22,11 @@ config :webtoon_shared,
 config :webtoon_scraper, WebtoonScraper.Scheduler,
   jobs: []
 
-# Crawly render server for dev
+# Crawly render server for dev - use our custom fetcher with scrolling support
 config :crawly,
   fetcher:
-    {Crawly.Fetchers.CrawlyRenderServer,
+    {WebtoonScraper.Fetchers.RenderServer,
      [
        base_url: System.get_env("RENDER_SERVER_URL", "http://localhost:3000/render")
-     ]}
+     ]},
+  timeout: 120_000
