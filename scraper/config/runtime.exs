@@ -10,27 +10,36 @@ if config_env() == :dev do
   IO.puts("[runtime.exs] Looking for env file at: #{env_file}")
   IO.puts("[runtime.exs] File exists: #{File.exists?(env_file)}")
 
-  if File.exists?(env_file) do
-    IO.puts("[runtime.exs] Loading environment from #{env_file}")
-    Dotenvy.source!([env_file])
-    IO.puts("[runtime.exs] Dotenvy loaded successfully")
-  else
-    IO.puts("[runtime.exs] WARNING: .env.dev file not found!")
+  # Load .env.dev and get the values as a map
+  env_vars =
+    if File.exists?(env_file) do
+      IO.puts("[runtime.exs] Loading environment from #{env_file}")
+      vars = Dotenvy.source!([env_file])
+      IO.puts("[runtime.exs] Dotenvy loaded: #{inspect(Map.keys(vars))}")
+      vars
+    else
+      IO.puts("[runtime.exs] WARNING: .env.dev file not found!")
+      %{}
+    end
+
+  # Helper to get value from loaded env or system env
+  get_env = fn key ->
+    Map.get(env_vars, key) || System.get_env(key)
   end
 
   # Debug: print R2 env vars
-  IO.puts("[runtime.exs] R2_BUCKET from env: #{inspect(System.get_env("R2_BUCKET"))}")
-  IO.puts("[runtime.exs] R2_ACCOUNT_ID from env: #{inspect(System.get_env("R2_ACCOUNT_ID"))}")
+  IO.puts("[runtime.exs] R2_BUCKET: #{inspect(get_env.("R2_BUCKET"))}")
+  IO.puts("[runtime.exs] R2_ACCOUNT_ID: #{inspect(get_env.("R2_ACCOUNT_ID"))}")
 
   # Configure R2 storage from environment variables (optional in dev)
-  if r2_bucket = System.get_env("R2_BUCKET") do
+  if r2_bucket = get_env.("R2_BUCKET") do
     IO.puts("[runtime.exs] Configuring R2 with bucket: #{r2_bucket}")
     config :webtoon_shared,
-      r2_account_id: System.get_env("R2_ACCOUNT_ID"),
-      r2_access_key_id: System.get_env("R2_ACCESS_KEY_ID"),
-      r2_secret_access_key: System.get_env("R2_SECRET_ACCESS_KEY"),
+      r2_account_id: get_env.("R2_ACCOUNT_ID"),
+      r2_access_key_id: get_env.("R2_ACCESS_KEY_ID"),
+      r2_secret_access_key: get_env.("R2_SECRET_ACCESS_KEY"),
       r2_bucket: r2_bucket,
-      r2_public_url: System.get_env("R2_PUBLIC_URL", "")
+      r2_public_url: get_env.("R2_PUBLIC_URL") || ""
   else
     IO.puts("[runtime.exs] WARNING: R2_BUCKET not set, R2 storage will not be configured")
   end
