@@ -188,6 +188,11 @@ defmodule WebtoonScraper.Spiders.MangaHub do
         chapter_number = extract_chapter_number(link_element)
         title = extract_chapter_title(link_element)
 
+        # Log first few chapters for debugging
+        if chapter_number && Decimal.lt?(chapter_number, Decimal.new(5)) do
+          Logger.debug("Chapter #{chapter_number}: title='#{title}', url=#{url}")
+        end
+
         if url && chapter_number do
           %{
             chapter_number: chapter_number,

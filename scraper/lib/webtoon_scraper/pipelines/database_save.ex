@@ -75,7 +75,8 @@ defmodule WebtoonScraper.Pipelines.DatabaseSave do
         webtoon_id: webtoon_id,
         chapter_number: chapter_number,
         title: chapter_title,
-        source_url: source_url
+        source_url: source_url,
+        needs_rescrape: false
       }
 
       chapter =
