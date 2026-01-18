@@ -65,6 +65,8 @@ defmodule WebtoonScraper.Fetchers.RenderServer do
     scroll = Keyword.get(options, :scroll, false)
     expected_images = Keyword.get(options, :expected_images)
 
+    Logger.debug("RenderServer options for #{url}: scroll=#{scroll}, expected_images=#{inspect(expected_images)}, all_options=#{inspect(Keyword.keys(options))}")
+
     # Build the render server request
     body_map = %{
       url: url,
