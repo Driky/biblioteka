@@ -59,18 +59,19 @@ defmodule WebtoonScraper.Spiders.Base do
 
       @impl Crawly.Spider
       def parse_item(response) do
-        source = WebtoonScraper.Sources.get_by_url(response.request_url)
+        # Check if this is a chapter page first (has metadata in options)
+        if is_chapter_page?(response) do
+          parse_chapter_page(response)
+        else
+          # For webtoon pages, look up source by URL
+          source = WebtoonScraper.Sources.get_by_url(response.request_url)
 
-        cond do
-          is_nil(source) ->
+          if is_nil(source) do
             Logger.warning("No source found for URL: #{response.request_url}")
             %Crawly.ParsedItem{items: [], requests: []}
-
-          is_chapter_page?(response) ->
-            parse_chapter_page(response)
-
-          true ->
+          else
             parse_webtoon_page(response, source)
+          end
         end
       end
 
