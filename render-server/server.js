@@ -239,11 +239,23 @@ app.post('/render', async (req, res) => {
     const finalImages = await countImages(page);
     const totalTime = Date.now() - requestStart;
 
+    // Validate body is not null/empty
+    if (!body) {
+      log('error', 'Page content returned null/undefined', { url });
+      return res.status(500).json({ error: 'Page content was null' });
+    }
+
+    const bodyLength = body.length;
+    if (bodyLength < 100) {
+      log('warn', 'Page content suspiciously short', { url, bodyLength });
+    }
+
     log('info', 'Render complete', {
       url,
       finalImageCount: finalImages,
       expectedImages: expectedImages || 'not specified',
       totalTime: `${totalTime}ms`,
+      bodyLength,
       success: !expectedImages || finalImages >= expectedImages
     });
 
