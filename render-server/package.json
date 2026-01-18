@@ -1,0 +1,13 @@
+{
+  "name": "webtoon-render-server",
+  "version": "1.0.0",
+  "description": "Custom render server with scrolling support for lazy-loaded images",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "puppeteer": "^21.6.1"
+  }
+}

@@ -131,13 +131,15 @@ defmodule WebtoonScraper.Spiders.Base do
             request = Crawly.Utils.request_from_url(ch.url)
 
             # Store chapter metadata in the options field
+            # Enable scrolling for chapter pages (lazy-loaded images)
             chapter_options = [
               source_id: source.id,
               webtoon_id: source.webtoon_id,
               webtoon_slug: source.webtoon && source.webtoon.slug,
               chapter_number: to_decimal(ch.chapter_number),
               chapter_title: ch.title,
-              source_url: ch.url
+              source_url: ch.url,
+              scroll: true
             ]
 
             %{request | options: chapter_options}

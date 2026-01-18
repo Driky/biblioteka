@@ -21,7 +21,6 @@ RUN apt-get update && apt-get install -y \
     libxdamage1 \
     libxrandr2 \
     xdg-utils \
-    git \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
@@ -31,12 +30,13 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 WORKDIR /app
 
-# Clone the crawly-render-server
-RUN git clone https://github.com/elixir-crawly/crawly-render-server.git .
-
-# Install dependencies
+# Copy package files and install dependencies
+COPY package.json ./
 RUN npm install
+
+# Copy server code
+COPY server.js ./
 
 EXPOSE 3000
 
-CMD ["node", "cluster.js"]
+CMD ["node", "server.js"]

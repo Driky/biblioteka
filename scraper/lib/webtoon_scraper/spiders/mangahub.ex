@@ -50,6 +50,9 @@ defmodule WebtoonScraper.Spiders.MangaHub do
   def parse_chapter_images(response) do
     {:ok, document} = Floki.parse_document(response.body)
 
+    # Extract expected image count from page indicator (e.g., "1/25")
+    expected_count = extract_expected_image_count(document)
+
     # MangaHub reader typically uses img tags within a reader container
     # Common selectors for manga reader pages
     images =
@@ -59,14 +62,25 @@ defmodule WebtoonScraper.Spiders.MangaHub do
       |> Enum.filter(&valid_image_url?/1)
 
     # If no images found with specific selectors, try a broader search
-    if Enum.empty?(images) do
-      document
-      |> Floki.find("img")
-      |> Floki.attribute("src")
-      |> Enum.filter(&is_chapter_image?/1)
-    else
-      images
+    images =
+      if Enum.empty?(images) do
+        document
+        |> Floki.find("img")
+        |> Floki.attribute("src")
+        |> Enum.filter(&is_chapter_image?/1)
+      else
+        images
+      end
+
+    # Log warning if we got fewer images than expected
+    if expected_count && length(images) < expected_count do
+      Logger.warning(
+        "Found #{length(images)} images but expected #{expected_count}. " <>
+          "Some images may not have loaded (lazy loading issue)."
+      )
     end
+
+    images
   end
 
   @impl WebtoonScraper.Spiders.Base
@@ -179,4 +193,27 @@ defmodule WebtoonScraper.Spiders.MangaHub do
          String.contains?(url, "chapter")) &&
       valid_image_url?(url)
   end
+
+  defp extract_expected_image_count(document) do
+    # MangaHub shows page indicator like "1/25" in <p class="_3w1ww">
+    document
+    |> Floki.find("p._3w1ww")
+    |> Floki.text()
+    |> parse_page_indicator()
+  end
+
+  defp parse_page_indicator(text) when is_binary(text) do
+    case Regex.run(~r/(\d+)\s*\/\s*(\d+)/, text) do
+      [_, _current, total] ->
+        case Integer.parse(total) do
+          {n, _} -> n
+          :error -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp parse_page_indicator(_), do: nil
 end

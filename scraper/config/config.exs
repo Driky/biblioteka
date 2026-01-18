@@ -27,15 +27,8 @@ config :crawly,
   # Increase manager timeout for storing many requests
   manager_operations_timeout: 30_000,
 
-  # Retry configuration for failed requests
-  retry: [
-    # Retry up to 3 times
-    max_retries: 3,
-    # Codes that should trigger a retry
-    retry_codes: [408, 429, 500, 502, 503, 504],
-    # Also retry on these conditions
-    ignored_middlewares: [Crawly.Middlewares.UniqueRequest]
-  ],
+  # Note: Retries are handled by our custom RenderServer fetcher
+  # to avoid conflicts with Crawly's request deduplication
 
   middlewares: [
     Crawly.Middlewares.DomainFilter,
