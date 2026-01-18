@@ -209,6 +209,14 @@ defmodule WebtoonScraper.Spiders.Base do
       end
 
       defp parse_chapter_page(response) do
+        # Debug: log the response structure to understand what Crawly passes
+        Logger.debug("Response keys: #{inspect(Map.keys(response))}")
+        request_data = Map.get(response, :request)
+        Logger.debug("Response.request type: #{inspect(request_data && request_data.__struct__)}")
+        if request_data do
+          Logger.debug("Request.options: #{inspect(Map.get(request_data, :options))}")
+        end
+
         # Try to get chapter metadata from request options first
         opts =
           case response do
