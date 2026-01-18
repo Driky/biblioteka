@@ -7,6 +7,7 @@ defmodule WebtoonScraper.Pipelines.DatabaseSave do
   @behaviour Crawly.Pipeline
 
   require Logger
+  import Ecto.Query
 
   alias WebtoonShared.Repo
   alias WebtoonShared.Schema.{Chapter, ChapterImage, Webtoon}
@@ -126,7 +127,7 @@ defmodule WebtoonScraper.Pipelines.DatabaseSave do
       chapter
     end)
     |> case do
-      {:ok, chapter} ->
+      {:ok, _chapter} ->
         # Update source's last_chapter_scraped
         Sources.update_last_scraped(source_id, chapter_number)
         Logger.info("Updated source #{source_id} last_chapter_scraped to #{chapter_number}")
