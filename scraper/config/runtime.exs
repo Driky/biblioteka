@@ -1,5 +1,26 @@
 import Config
 
+# Load environment variables from .env files
+# In dev: loads ../.env.dev (project root)
+# In prod: expects env vars to be set by the deployment
+if config_env() == :dev do
+  env_file = Path.expand("../../.env.dev", __DIR__)
+
+  if File.exists?(env_file) do
+    Dotenvy.source!([env_file])
+  end
+
+  # Configure R2 storage from environment variables (optional in dev)
+  if r2_bucket = System.get_env("R2_BUCKET") do
+    config :webtoon_shared,
+      r2_account_id: System.get_env("R2_ACCOUNT_ID"),
+      r2_access_key_id: System.get_env("R2_ACCESS_KEY_ID"),
+      r2_secret_access_key: System.get_env("R2_SECRET_ACCESS_KEY"),
+      r2_bucket: r2_bucket,
+      r2_public_url: System.get_env("R2_PUBLIC_URL", "")
+  end
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

@@ -40,7 +40,10 @@ defmodule WebtoonScraper.MixProject do
       {:req, "~> 0.4"},
 
       # JSON
-      {:jason, "~> 1.4"}
+      {:jason, "~> 1.4"},
+
+      # Environment variables from .env files
+      {:dotenvy, "~> 0.8"}
     ]
   end
 end
