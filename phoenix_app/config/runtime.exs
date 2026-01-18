@@ -1,4 +1,23 @@
 import Config
+import Dotenvy
+
+# Load environment variables from .env files
+env_dir = Path.expand("../..", __DIR__)
+
+source!([
+  Path.absname(".env.dev", env_dir),
+  System.get_env()
+])
+
+# Configure R2 storage (for image URLs in templates)
+if r2_bucket = env!("R2_BUCKET", :string?) do
+  config :webtoon_shared,
+    r2_account_id: env!("R2_ACCOUNT_ID", :string),
+    r2_access_key_id: env!("R2_ACCESS_KEY_ID", :string),
+    r2_secret_access_key: env!("R2_SECRET_ACCESS_KEY", :string),
+    r2_bucket: r2_bucket,
+    r2_public_url: env!("R2_PUBLIC_URL", :string) || ""
+end
 
 if config_env() == :prod do
   database_url =

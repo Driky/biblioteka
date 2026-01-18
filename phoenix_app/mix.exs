@@ -51,7 +51,10 @@ defmodule WebtoonWeb.MixProject do
       {:jason, "~> 1.4"},
 
       # DNS cluster (for releases)
-      {:dns_cluster, "~> 0.1"}
+      {:dns_cluster, "~> 0.1"},
+
+      # Environment variables from .env files
+      {:dotenvy, "~> 0.8"}
     ]
   end
 
