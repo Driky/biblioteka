@@ -149,14 +149,20 @@ defmodule WebtoonScraper.Pipelines.ImageProcessor do
   end
 
   defp get_content_type(headers, url) do
-    # Try to get from headers first
-    case List.keyfind(headers, "content-type", 0) do
-      {_, type} ->
-        type |> String.split(";") |> List.first() |> String.trim()
+    # Req returns headers as a map with list values
+    # e.g., %{"content-type" => ["image/webp"]}
+    content_type =
+      case headers do
+        %{"content-type" => [type | _]} -> type
+        %{"content-type" => type} when is_binary(type) -> type
+        _ -> nil
+      end
 
-      nil ->
-        # Fall back to URL extension
-        guess_content_type_from_url(url)
+    if content_type do
+      content_type |> String.split(";") |> List.first() |> String.trim()
+    else
+      # Fall back to URL extension
+      guess_content_type_from_url(url)
     end
   end
 

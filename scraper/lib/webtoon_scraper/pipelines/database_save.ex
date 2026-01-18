@@ -28,33 +28,36 @@ defmodule WebtoonScraper.Pipelines.DatabaseSave do
   end
 
   defp save_cover(item, state) do
-    %{
-      webtoon_id: webtoon_id,
-      storage_path: storage_path
-    } = item
+    # Check if storage_path exists (set by R2Upload pipeline)
+    case item do
+      %{webtoon_id: webtoon_id, storage_path: storage_path} ->
+        # Build the public URL for the cover
+        public_url = Application.get_env(:webtoon_shared, :r2_public_url, "")
+        cover_url = "#{public_url}/#{storage_path}"
 
-    # Build the public URL for the cover
-    public_url = Application.get_env(:webtoon_shared, :r2_public_url, "")
-    cover_url = "#{public_url}/#{storage_path}"
-
-    case Repo.get(Webtoon, webtoon_id) do
-      nil ->
-        Logger.error("Webtoon #{webtoon_id} not found, cannot save cover")
-        {false, state}
-
-      webtoon ->
-        webtoon
-        |> Webtoon.changeset(%{cover_url: cover_url})
-        |> Repo.update()
-        |> case do
-          {:ok, _} ->
-            Logger.info("Updated webtoon #{webtoon_id} cover_url to #{cover_url}")
-            {item, state}
-
-          {:error, reason} ->
-            Logger.error("Failed to update webtoon cover: #{inspect(reason)}")
+        case Repo.get(Webtoon, webtoon_id) do
+          nil ->
+            Logger.error("Webtoon #{webtoon_id} not found, cannot save cover")
             {false, state}
+
+          webtoon ->
+            webtoon
+            |> Webtoon.changeset(%{cover_url: cover_url})
+            |> Repo.update()
+            |> case do
+              {:ok, _} ->
+                Logger.info("Updated webtoon #{webtoon_id} cover_url to #{cover_url}")
+                {item, state}
+
+              {:error, reason} ->
+                Logger.error("Failed to update webtoon cover: #{inspect(reason)}")
+                {false, state}
+            end
         end
+
+      _ ->
+        Logger.warning("Cover item missing storage_path, skipping database save")
+        {item, state}
     end
   end
 
