@@ -238,7 +238,8 @@ defmodule WebtoonScraper.Spiders.Base do
         Logger.info(
           "Parsing chapter #{inspect(chapter_number)} images from #{url}"
         )
-        Logger.debug("Chapter metadata - webtoon_id: #{inspect(webtoon_id)}, source_id: #{inspect(source_id)}")
+        Logger.debug("Chapter metadata - webtoon_id: #{inspect(webtoon_id)}, source_id: #{inspect(source_id)}, title: #{inspect(chapter_title)}")
+        Logger.debug("Options keys received: #{inspect(Keyword.keys(opts))}")
 
         # Parse images from page
         raw_images = parse_chapter_images(response)
