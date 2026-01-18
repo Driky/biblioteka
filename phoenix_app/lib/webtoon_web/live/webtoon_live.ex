@@ -42,7 +42,7 @@ defmodule WebtoonWeb.WebtoonLive do
           <div class="aspect-[3/4] bg-gray-200 rounded-lg overflow-hidden">
             <img
               :if={@webtoon.cover_url}
-              src={@webtoon.cover_url}
+              src={storage_url(@webtoon.cover_url)}
               alt={@webtoon.title}
               class="w-full h-full object-cover"
             />

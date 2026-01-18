@@ -80,6 +80,7 @@ defmodule WebtoonWeb do
       import Phoenix.HTML
 
       import WebtoonWeb.CoreComponents
+      import WebtoonWeb.StorageHelpers
 
       alias Phoenix.LiveView.JS
 

@@ -31,10 +31,8 @@ defmodule WebtoonScraper.Pipelines.DatabaseSave do
     # Check if storage_path exists (set by R2Upload pipeline)
     case item do
       %{webtoon_id: webtoon_id, storage_path: storage_path} ->
-        # Build the public URL for the cover
-        public_url = Application.get_env(:webtoon_shared, :r2_public_url, "")
-        cover_url = "#{public_url}/#{storage_path}"
-
+        # Store just the path, not the full URL
+        # The full URL will be built at display time using R2_PUBLIC_URL config
         case Repo.get(Webtoon, webtoon_id) do
           nil ->
             Logger.error("Webtoon #{webtoon_id} not found, cannot save cover")
@@ -42,11 +40,11 @@ defmodule WebtoonScraper.Pipelines.DatabaseSave do
 
           webtoon ->
             webtoon
-            |> Webtoon.changeset(%{cover_url: cover_url})
+            |> Webtoon.changeset(%{cover_url: storage_path})
             |> Repo.update()
             |> case do
               {:ok, _} ->
-                Logger.info("Updated webtoon #{webtoon_id} cover_url to #{cover_url}")
+                Logger.info("Updated webtoon #{webtoon_id} cover_url to #{storage_path}")
                 {item, state}
 
               {:error, reason} ->

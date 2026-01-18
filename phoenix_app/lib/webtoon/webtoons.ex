@@ -186,8 +186,16 @@ defmodule Webtoon.Webtoons do
   # ============================================================================
 
   defp add_public_url(%ChapterImage{storage_path: path} = image) do
-    public_url = Application.get_env(:webtoon_shared, :r2_public_url, "")
-    Map.put(image, :url, "#{public_url}/#{path}")
+    url =
+      if String.starts_with?(path || "", "http") do
+        # Backwards compatibility: path is already a full URL
+        path
+      else
+        public_url = Application.get_env(:webtoon_shared, :r2_public_url, "")
+        "#{public_url}/#{path}"
+      end
+
+    Map.put(image, :url, url)
   end
 
   defp parse_chapter_number(number) when is_binary(number) do
