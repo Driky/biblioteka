@@ -87,8 +87,15 @@ defmodule WebtoonScraper.Spiders.MangaHub do
         []
 
       {:ok, document} ->
+        # Debug: log page title and body snippet
+        title = document |> Floki.find("title") |> Floki.text()
+        body_preview = String.slice(response.body || "", 0, 500)
+        Logger.debug("Chapter page title: #{title}")
+        Logger.debug("Chapter body preview: #{body_preview}")
+
         # Extract expected image count from page indicator (e.g., "1/25")
         expected_count = extract_expected_image_count(document)
+        Logger.debug("Expected image count from page: #{inspect(expected_count)}")
 
         # MangaHub reader typically uses img tags within a reader container
         # Common selectors for manga reader pages

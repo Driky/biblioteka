@@ -85,7 +85,14 @@ defmodule WebtoonScraper.Spiders.Base do
             _ -> []
           end
 
-        Keyword.has_key?(options, :chapter_number)
+        has_chapter_option = Keyword.has_key?(options, :chapter_number)
+
+        # Fallback: check URL pattern if options aren't available
+        # (happens when using custom fetcher that doesn't preserve request)
+        url = response.request_url || ""
+        is_chapter_url = String.contains?(url, "/chapter/")
+
+        has_chapter_option || is_chapter_url
       end
 
       defp parse_webtoon_page(response, source) do
@@ -202,18 +209,36 @@ defmodule WebtoonScraper.Spiders.Base do
       end
 
       defp parse_chapter_page(response) do
-        # Get chapter metadata from request options
-        opts = response.request.options || []
-        chapter_number = Keyword.get(opts, :chapter_number)
+        # Try to get chapter metadata from request options first
+        opts =
+          case response do
+            %{request: %{options: o}} when is_list(o) -> o
+            %{request: %Crawly.Request{options: o}} when is_list(o) -> o
+            _ -> []
+          end
+
+        url = response.request_url || ""
+
+        # Extract chapter number from options or URL
+        chapter_number = Keyword.get(opts, :chapter_number) || extract_chapter_number_from_url(url)
         chapter_title = Keyword.get(opts, :chapter_title)
         source_id = Keyword.get(opts, :source_id)
         webtoon_id = Keyword.get(opts, :webtoon_id)
         webtoon_slug = Keyword.get(opts, :webtoon_slug)
-        source_url = Keyword.get(opts, :source_url)
+        source_url = Keyword.get(opts, :source_url) || url
+
+        # If we don't have webtoon_id, try to look it up from the URL
+        {webtoon_id, webtoon_slug, source_id} =
+          if is_nil(webtoon_id) do
+            lookup_webtoon_from_chapter_url(url)
+          else
+            {webtoon_id, webtoon_slug, source_id}
+          end
 
         Logger.info(
-          "Parsing chapter #{chapter_number} images from #{response.request_url}"
+          "Parsing chapter #{inspect(chapter_number)} images from #{url}"
         )
+        Logger.debug("Chapter metadata - webtoon_id: #{inspect(webtoon_id)}, source_id: #{inspect(source_id)}")
 
         # Parse images from page
         raw_images = parse_chapter_images(response)
@@ -272,6 +297,53 @@ defmodule WebtoonScraper.Spiders.Base do
           :error -> Decimal.new(0)
         end
       end
+
+      # Extract chapter number from URL like /chapter/manga-name/chapter-123
+      defp extract_chapter_number_from_url(url) when is_binary(url) do
+        case Regex.run(~r/chapter[_-]?(\d+(?:\.\d+)?)/i, url) do
+          [_, num_str] ->
+            case Decimal.parse(num_str) do
+              {decimal, _} -> decimal
+              :error -> nil
+            end
+
+          _ ->
+            nil
+        end
+      end
+
+      defp extract_chapter_number_from_url(_), do: nil
+
+      # Look up webtoon info from chapter URL by finding source with matching base URL
+      defp lookup_webtoon_from_chapter_url(chapter_url) when is_binary(chapter_url) do
+        # Extract the manga identifier from URL
+        # e.g., /chapter/solo-leveling_105/chapter-4 -> solo-leveling_105
+        case Regex.run(~r{/chapter/([^/]+)/}, chapter_url) do
+          [_, manga_slug] ->
+            # Try to find source by matching URL pattern
+            import Ecto.Query
+
+            source =
+              WebtoonShared.Schema.WebtoonSource
+              |> where([s], like(s.source_url, ^"%#{manga_slug}%"))
+              |> preload(:webtoon)
+              |> WebtoonShared.Repo.one()
+
+            if source do
+              Logger.debug("Found source for chapter URL: #{chapter_url} -> #{source.webtoon && source.webtoon.title}")
+              {source.webtoon_id, source.webtoon && source.webtoon.slug, source.id}
+            else
+              Logger.warning("Could not find source for chapter URL: #{chapter_url}")
+              {nil, nil, nil}
+            end
+
+          _ ->
+            Logger.warning("Could not extract manga slug from URL: #{chapter_url}")
+            {nil, nil, nil}
+        end
+      end
+
+      defp lookup_webtoon_from_chapter_url(_), do: {nil, nil, nil}
 
       # Allow override
       defoverridable init: 0
