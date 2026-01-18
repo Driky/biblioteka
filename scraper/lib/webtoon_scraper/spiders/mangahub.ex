@@ -41,13 +41,37 @@ defmodule WebtoonScraper.Spiders.MangaHub do
   def parse_chapter_list(response) do
     case parse_body(response.body) do
       {:ok, document} ->
+        # Debug: log page title and body snippet to help diagnose issues
+        title = document |> Floki.find("title") |> Floki.text()
+        body_preview = String.slice(response.body || "", 0, 500)
+        Logger.debug("Page title: #{title}")
+        Logger.debug("Body preview: #{body_preview}")
+
         # Chapters are in: li._287KE.list-group-item
         # Each contains a link with class _3pfyN
-        document
-        |> Floki.find("li._287KE.list-group-item")
-        |> Enum.map(&parse_chapter_item/1)
-        |> Enum.reject(&is_nil/1)
-        |> Enum.uniq_by(& &1.chapter_number)
+        chapters =
+          document
+          |> Floki.find("li._287KE.list-group-item")
+          |> Enum.map(&parse_chapter_item/1)
+          |> Enum.reject(&is_nil/1)
+          |> Enum.uniq_by(& &1.chapter_number)
+
+        if Enum.empty?(chapters) do
+          Logger.warning("No chapters found. Checking for common issues...")
+          # Check for Cloudflare challenge
+          if String.contains?(response.body || "", "cf-browser-verification") do
+            Logger.error("Cloudflare challenge detected - browser verification required")
+          end
+          # Check for rate limiting
+          if String.contains?(response.body || "", "rate limit") do
+            Logger.error("Rate limiting detected")
+          end
+          # Log selector debug info
+          all_lis = document |> Floki.find("li") |> length()
+          Logger.debug("Total <li> elements on page: #{all_lis}")
+        end
+
+        chapters
 
       {:error, reason} ->
         Logger.error("Failed to parse chapter list: #{inspect(reason)}")
