@@ -105,16 +105,41 @@ defmodule WebtoonScraper.Spiders.MangaHub do
           |> Floki.attribute("src")
           |> Enum.filter(&valid_image_url?/1)
 
-        # If no images found with specific selectors, try a broader search
+        # If no images found with src, try data-src (lazy loading fallback)
         images =
           if Enum.empty?(images) do
+            Logger.debug("No images found with src, trying data-src attribute")
             document
-            |> Floki.find("img")
-            |> Floki.attribute("src")
-            |> Enum.filter(&is_chapter_image?/1)
+            |> Floki.find("img.PB0mN, img[data-src*='imghub'], .reader-content img, #images img")
+            |> Floki.attribute("data-src")
+            |> Enum.filter(&valid_image_url?/1)
           else
             images
           end
+
+        # If still no images, try a broader search with both src and data-src
+        images =
+          if Enum.empty?(images) do
+            Logger.debug("Trying broader img search")
+            src_images =
+              document
+              |> Floki.find("img")
+              |> Floki.attribute("src")
+              |> Enum.filter(&is_chapter_image?/1)
+
+            if Enum.empty?(src_images) do
+              document
+              |> Floki.find("img")
+              |> Floki.attribute("data-src")
+              |> Enum.filter(&is_chapter_image?/1)
+            else
+              src_images
+            end
+          else
+            images
+          end
+
+        Logger.debug("Found #{length(images)} chapter images")
 
         # Log warning if we got fewer images than expected
         if expected_count && length(images) < expected_count do
@@ -134,7 +159,7 @@ defmodule WebtoonScraper.Spiders.MangaHub do
       {"Referer", base_url()},
       {"Accept", "image/webp,image/apng,image/*,*/*;q=0.8"},
       {"User-Agent",
-       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:134.0) Gecko/20100101 Firefox/134.0"}
     ]
   end
 

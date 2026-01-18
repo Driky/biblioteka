@@ -165,9 +165,9 @@ app.post('/render', async (req, res) => {
       await page.setExtraHTTPHeaders(headers);
     }
 
-    // Set a realistic user agent
+    // Set a realistic user agent (Firefox on Mac - less likely to be blocked)
     await page.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:134.0) Gecko/20100101 Firefox/134.0'
     );
 
     // Navigate to the page
