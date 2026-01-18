@@ -6,8 +6,7 @@ defmodule WebtoonScraper.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      # Start the shared repo
-      WebtoonShared.Repo,
+      # Repo is started by WebtoonShared.Application
       # Start the scheduler
       WebtoonScraper.Scheduler
     ]
