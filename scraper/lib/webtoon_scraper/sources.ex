@@ -99,13 +99,45 @@ defmodule WebtoonScraper.Sources do
 
   @doc """
   Gets all chapter numbers that have been successfully scraped for a webtoon.
+  Excludes chapters marked for rescrape.
   Returns a MapSet of Decimal chapter numbers for efficient lookup.
   """
   def get_scraped_chapter_numbers(webtoon_id) do
     Chapter
-    |> where([c], c.webtoon_id == ^webtoon_id)
+    |> where([c], c.webtoon_id == ^webtoon_id and c.needs_rescrape == false)
     |> select([c], c.chapter_number)
     |> Repo.all()
     |> MapSet.new()
+  end
+
+  @doc """
+  Gets chapters that need to be rescraped for a webtoon.
+  Returns a list of {chapter_number, source_url} tuples.
+  """
+  def get_chapters_needing_rescrape(webtoon_id) do
+    Chapter
+    |> where([c], c.webtoon_id == ^webtoon_id and c.needs_rescrape == true)
+    |> select([c], {c.chapter_number, c.source_url})
+    |> Repo.all()
+  end
+
+  @doc """
+  Marks a chapter for rescraping.
+  """
+  def mark_for_rescrape(chapter_id) do
+    Chapter
+    |> Repo.get!(chapter_id)
+    |> Chapter.changeset(%{needs_rescrape: true})
+    |> Repo.update()
+  end
+
+  @doc """
+  Clears the rescrape flag for a chapter (called after successful rescrape).
+  """
+  def clear_rescrape_flag(chapter_id) do
+    Chapter
+    |> Repo.get!(chapter_id)
+    |> Chapter.changeset(%{needs_rescrape: false})
+    |> Repo.update()
   end
 end

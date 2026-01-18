@@ -18,69 +18,83 @@ defmodule WebtoonScraper.Spiders.MangaHub do
 
   # Optional: extracts cover image from the webtoon page
   def parse_cover_image(response) do
-    {:ok, document} = Floki.parse_document(response.body)
+    case parse_body(response.body) do
+      {:ok, document} ->
+        # Cover is in: <section class="_2fecr" style="background-image:url("...")">
+        # Located within #mangadetail
+        document
+        |> Floki.find("#mangadetail section._2fecr")
+        |> Floki.attribute("style")
+        |> List.first()
+        |> extract_background_image_url()
+        |> case do
+          nil -> nil
+          url -> %{url: url, headers: image_headers(url)}
+        end
 
-    # Cover is in: <section class="_2fecr" style="background-image:url("...")">
-    # Located within #mangadetail
-    document
-    |> Floki.find("#mangadetail section._2fecr")
-    |> Floki.attribute("style")
-    |> List.first()
-    |> extract_background_image_url()
-    |> case do
-      nil -> nil
-      url -> %{url: url, headers: image_headers(url)}
+      {:error, _} ->
+        nil
     end
   end
 
   @impl WebtoonScraper.Spiders.Base
   def parse_chapter_list(response) do
-    {:ok, document} = Floki.parse_document(response.body)
+    case parse_body(response.body) do
+      {:ok, document} ->
+        # Chapters are in: li._287KE.list-group-item
+        # Each contains a link with class _3pfyN
+        document
+        |> Floki.find("li._287KE.list-group-item")
+        |> Enum.map(&parse_chapter_item/1)
+        |> Enum.reject(&is_nil/1)
+        |> Enum.uniq_by(& &1.chapter_number)
 
-    # Chapters are in: li._287KE.list-group-item
-    # Each contains a link with class _3pfyN
-    document
-    |> Floki.find("li._287KE.list-group-item")
-    |> Enum.map(&parse_chapter_item/1)
-    |> Enum.reject(&is_nil/1)
-    |> Enum.uniq_by(& &1.chapter_number)
+      {:error, reason} ->
+        Logger.error("Failed to parse chapter list: #{inspect(reason)}")
+        []
+    end
   end
 
   @impl WebtoonScraper.Spiders.Base
   def parse_chapter_images(response) do
-    {:ok, document} = Floki.parse_document(response.body)
+    case parse_body(response.body) do
+      {:error, reason} ->
+        Logger.error("Failed to parse chapter images: #{inspect(reason)}")
+        []
 
-    # Extract expected image count from page indicator (e.g., "1/25")
-    expected_count = extract_expected_image_count(document)
+      {:ok, document} ->
+        # Extract expected image count from page indicator (e.g., "1/25")
+        expected_count = extract_expected_image_count(document)
 
-    # MangaHub reader typically uses img tags within a reader container
-    # Common selectors for manga reader pages
-    images =
-      document
-      |> Floki.find("img.PB0mN, img[src*='imghub'], .reader-content img, #images img")
-      |> Floki.attribute("src")
-      |> Enum.filter(&valid_image_url?/1)
+        # MangaHub reader typically uses img tags within a reader container
+        # Common selectors for manga reader pages
+        images =
+          document
+          |> Floki.find("img.PB0mN, img[src*='imghub'], .reader-content img, #images img")
+          |> Floki.attribute("src")
+          |> Enum.filter(&valid_image_url?/1)
 
-    # If no images found with specific selectors, try a broader search
-    images =
-      if Enum.empty?(images) do
-        document
-        |> Floki.find("img")
-        |> Floki.attribute("src")
-        |> Enum.filter(&is_chapter_image?/1)
-      else
+        # If no images found with specific selectors, try a broader search
+        images =
+          if Enum.empty?(images) do
+            document
+            |> Floki.find("img")
+            |> Floki.attribute("src")
+            |> Enum.filter(&is_chapter_image?/1)
+          else
+            images
+          end
+
+        # Log warning if we got fewer images than expected
+        if expected_count && length(images) < expected_count do
+          Logger.warning(
+            "Found #{length(images)} images but expected #{expected_count}. " <>
+              "Some images may not have loaded (lazy loading issue)."
+          )
+        end
+
         images
-      end
-
-    # Log warning if we got fewer images than expected
-    if expected_count && length(images) < expected_count do
-      Logger.warning(
-        "Found #{length(images)} images but expected #{expected_count}. " <>
-          "Some images may not have loaded (lazy loading issue)."
-      )
     end
-
-    images
   end
 
   @impl WebtoonScraper.Spiders.Base
@@ -94,6 +108,18 @@ defmodule WebtoonScraper.Spiders.MangaHub do
   end
 
   # Private helpers
+
+  defp parse_body(nil) do
+    {:error, :nil_body}
+  end
+
+  defp parse_body("") do
+    {:error, :empty_body}
+  end
+
+  defp parse_body(body) when is_binary(body) do
+    Floki.parse_document(body)
+  end
 
   defp parse_chapter_item(element) do
     # Find the primary chapter link (class _3pfyN)

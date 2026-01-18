@@ -9,6 +9,7 @@ defmodule WebtoonShared.Schema.Chapter do
     field :chapter_number, :decimal
     field :title, :string
     field :source_url, :string
+    field :needs_rescrape, :boolean, default: false
 
     belongs_to :webtoon, WebtoonShared.Schema.Webtoon
     has_many :images, WebtoonShared.Schema.ChapterImage
@@ -17,7 +18,7 @@ defmodule WebtoonShared.Schema.Chapter do
   end
 
   @required_fields [:chapter_number, :source_url, :webtoon_id]
-  @optional_fields [:title]
+  @optional_fields [:title, :needs_rescrape]
 
   def changeset(chapter, attrs) do
     chapter
