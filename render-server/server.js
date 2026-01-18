@@ -1,5 +1,9 @@
 const express = require('express');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+
+// Use stealth plugin to avoid Cloudflare detection
+puppeteer.use(StealthPlugin());
 
 const app = express();
 app.use(express.json());
@@ -141,6 +145,34 @@ async function countImages(page) {
   });
 }
 
+// Detect and wait for Cloudflare challenge to complete
+async function waitForCloudflare(page, maxWaitTime = 30000) {
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < maxWaitTime) {
+    const title = await page.title();
+    const isChallenge = title.includes('Just a moment') ||
+                        title.includes('Cloudflare') ||
+                        title.includes('Checking your browser');
+
+    if (!isChallenge) {
+      log('debug', 'Cloudflare challenge passed or not present', { title });
+      return true;
+    }
+
+    log('debug', 'Waiting for Cloudflare challenge...', {
+      elapsed: Date.now() - startTime,
+      title
+    });
+
+    // Wait a bit before checking again
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+
+  log('warn', 'Cloudflare challenge timeout', { elapsed: Date.now() - startTime });
+  return false;
+}
+
 app.post('/render', async (req, res) => {
   const { url, headers = {}, scroll = false, expectedImages = null, waitForSelector = null } = req.body;
   const requestStart = Date.now();
@@ -180,11 +212,24 @@ app.post('/render', async (req, res) => {
     });
 
     const navTime = Date.now() - navStart;
+    log('info', 'Initial navigation complete', {
+      url,
+      navigationTime: `${navTime}ms`
+    });
+
+    // Wait for Cloudflare challenge to complete (if present)
+    const cfPassed = await waitForCloudflare(page, 30000);
+    if (!cfPassed) {
+      log('error', 'Cloudflare challenge not passed', { url });
+      // Continue anyway - might still have partial content
+    }
+
     const initialImages = await countImages(page);
     log('info', 'Page loaded', {
       url,
       navigationTime: `${navTime}ms`,
-      initialImageCount: initialImages
+      initialImageCount: initialImages,
+      cloudflareCleared: cfPassed
     });
 
     // Wait for specific selector if provided
