@@ -11,15 +11,12 @@ config :webtoon_scraper,
 
 # Crawly configuration
 config :crawly,
-  # Fetcher configuration - use HTTPoison by default
-  # For JS-rendered pages, use CrawlyRenderServer (requires render server running)
-  fetcher: {Crawly.Fetchers.HTTPoisonFetcher, []},
-  # To use render server instead, set CRAWLY_USE_RENDER_SERVER=true
-  # fetcher:
-  #   {Crawly.Fetchers.CrawlyRenderServer,
-  #    [
-  #      base_url: System.get_env("RENDER_SERVER_URL", "http://localhost:3000/render")
-  #    ]},
+  # Fetcher configuration - use custom render server fetcher for JS-rendered pages
+  fetcher:
+    {WebtoonScraper.Fetchers.RenderServer,
+     [
+       base_url: System.get_env("RENDER_SERVER_URL", "http://localhost:3000/render")
+     ]},
 
   # Rate limiting: keep low to avoid bans
   concurrent_requests_per_domain: 1,
