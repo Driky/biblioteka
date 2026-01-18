@@ -159,6 +159,82 @@ cd phoenix_app && mix test
 cd scraper && mix test
 ```
 
+## Running a Spider (Development)
+
+To run a spider, you need to set up the database records first, then start the spider.
+
+### 1. Create a Webtoon and Source
+
+Start an IEx session from the scraper directory:
+
+```bash
+cd scraper
+export DATABASE_URL=ecto://postgres:postgres@localhost/webtoon_dev
+iex -S mix
+```
+
+Then create the required database records:
+
+```elixir
+alias WebtoonShared.Repo
+alias WebtoonShared.Schema.{Webtoon, WebtoonSource}
+
+# Create a webtoon
+{:ok, webtoon} = Repo.insert(%Webtoon{
+  title: "Solo Leveling",
+  slug: "solo-leveling"
+})
+
+# Create a source linking to the webtoon
+# site_id must match the spider's site_id (e.g., "mangahub", "mangadex")
+{:ok, source} = Repo.insert(%WebtoonSource{
+  webtoon_id: webtoon.id,
+  site_id: "mangahub",
+  source_url: "https://mangahub.io/manga/solo-leveling",
+  enabled: true
+})
+```
+
+### 2. Start the Render Server
+
+The render server must be running for JavaScript-rendered sites:
+
+```bash
+# In a separate terminal
+cd render-server
+docker build -t crawly-render-server .
+docker run -d --name crawly_render -p 3000:3000 crawly-render-server
+```
+
+### 3. Run the Spider
+
+In the IEx session:
+
+```elixir
+# Run the spider (with jitter delay)
+WebtoonScraper.Runner.run_spider(WebtoonScraper.Spiders.MangaHub)
+
+# Or start immediately without jitter
+Crawly.Engine.start_spider(WebtoonScraper.Spiders.MangaHub)
+
+# Check running spiders
+Crawly.Engine.running_spiders()
+
+# Stop a spider
+Crawly.Engine.stop_spider(WebtoonScraper.Spiders.MangaHub)
+```
+
+### 4. Monitor Progress
+
+```elixir
+# Check scraped chapters
+alias WebtoonShared.Schema.Chapter
+Repo.all(Chapter) |> length()
+
+# Check source status
+Repo.get(WebtoonSource, source.id) |> Map.take([:last_checked_at, :last_chapter_scraped])
+```
+
 ## Adding a New Spider
 
 1. Create a new spider module in `scraper/lib/webtoon_scraper/spiders/`:
