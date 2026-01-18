@@ -87,6 +87,7 @@ defmodule WebtoonScraper.Spiders.Base do
 
       defp parse_webtoon_page(response, source) do
         last_scraped = source.last_chapter_scraped || Decimal.new(0)
+        max_chapters = Application.get_env(:webtoon_scraper, :max_chapters_per_run, 20)
 
         # Parse chapter list from page
         chapters = parse_chapter_list(response)
@@ -99,15 +100,17 @@ defmodule WebtoonScraper.Spiders.Base do
         cover_item = extract_cover_image(response, source)
 
         # Filter to only new chapters (chapter_number > last_scraped)
+        # Sort by chapter number and take only max_chapters_per_run
         new_chapters =
           chapters
           |> Enum.filter(fn ch ->
             ch_num = to_decimal(ch.chapter_number)
             Decimal.compare(ch_num, last_scraped) == :gt
           end)
-          |> Enum.sort_by(& &1.chapter_number)
+          |> Enum.sort_by(&to_decimal(&1.chapter_number))
+          |> Enum.take(max_chapters)
 
-        Logger.info("#{length(new_chapters)} new chapters to scrape")
+        Logger.info("#{length(new_chapters)} new chapters to scrape (max #{max_chapters} per run)")
 
         # Mark source as checked even if no new chapters
         if Enum.empty?(new_chapters) do

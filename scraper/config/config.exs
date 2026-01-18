@@ -4,7 +4,10 @@ import Config
 import_config "../../shared/config/config.exs"
 
 config :webtoon_scraper,
-  ecto_repos: [WebtoonShared.Repo]
+  ecto_repos: [WebtoonShared.Repo],
+  # Maximum number of new chapters to scrape per spider run
+  # This prevents overwhelming the target site and request storage
+  max_chapters_per_run: 20
 
 # Crawly configuration
 config :crawly,
@@ -20,6 +23,9 @@ config :crawly,
 
   # Delay between requests (milliseconds) - be polite to target sites
   request_delay: 3_000,
+
+  # Increase manager timeout for storing many requests
+  manager_operations_timeout: 30_000,
 
   middlewares: [
     Crawly.Middlewares.DomainFilter,
