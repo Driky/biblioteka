@@ -69,6 +69,8 @@ defmodule WebtoonScraper.Pipelines.DatabaseSave do
       images: images
     } = item
 
+    Logger.debug("DatabaseSave: chapter_title=#{inspect(chapter_title)} for chapter #{chapter_number}")
+
     Repo.transaction(fn ->
       # Insert or update chapter
       chapter_attrs = %{
