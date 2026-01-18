@@ -27,9 +27,20 @@ config :crawly,
   # Increase manager timeout for storing many requests
   manager_operations_timeout: 30_000,
 
+  # Retry configuration for failed requests
+  retry: [
+    # Retry up to 3 times
+    max_retries: 3,
+    # Codes that should trigger a retry
+    retry_codes: [408, 429, 500, 502, 503, 504],
+    # Also retry on these conditions
+    ignored_middlewares: [Crawly.Middlewares.UniqueRequest]
+  ],
+
   middlewares: [
     Crawly.Middlewares.DomainFilter,
-    Crawly.Middlewares.UniqueRequest,
+    # Note: UniqueRequest removed - it blocks retries and we have our own
+    # chapter filtering logic that prevents duplicate chapter scraping
     {Crawly.Middlewares.UserAgent,
      user_agents: [
        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
