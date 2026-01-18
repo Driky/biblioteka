@@ -77,7 +77,14 @@ defmodule WebtoonScraper.Spiders.Base do
 
       defp is_chapter_page?(response) do
         # Check if this is a chapter page by looking at options in the request
-        options = response.request.options || []
+        # Handle case where request or options might be nil
+        options =
+          case response do
+            %{request: %{options: opts}} when is_list(opts) -> opts
+            %{request: %Crawly.Request{options: opts}} when is_list(opts) -> opts
+            _ -> []
+          end
+
         Keyword.has_key?(options, :chapter_number)
       end
 
