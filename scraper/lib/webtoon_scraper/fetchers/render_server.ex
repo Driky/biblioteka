@@ -15,6 +15,37 @@ defmodule WebtoonScraper.Fetchers.RenderServer do
 
   @max_retries 3
   @retry_delays [2_000, 4_000, 8_000]
+  @options_table :webtoon_request_options
+
+  @doc """
+  Retrieves stored options for a URL. Used by spiders to get chapter metadata.
+  """
+  def get_options(url) do
+    ensure_table_exists()
+    case :ets.lookup(@options_table, url) do
+      [{^url, options}] -> options
+      [] -> []
+    end
+  end
+
+  defp ensure_table_exists do
+    case :ets.whereis(@options_table) do
+      :undefined ->
+        :ets.new(@options_table, [:set, :public, :named_table])
+      _ ->
+        :ok
+    end
+  end
+
+  defp store_options(url, options) do
+    ensure_table_exists()
+    :ets.insert(@options_table, {url, options})
+  end
+
+  defp clear_options(url) do
+    ensure_table_exists()
+    :ets.delete(@options_table, url)
+  end
 
   @impl true
   def fetch(request, client_options) do
@@ -53,7 +84,10 @@ defmodule WebtoonScraper.Fetchers.RenderServer do
     if is_nil(url) do
       {:error, :invalid_request}
     else
-      # Build a Crawly.Request to preserve options through the response
+      # Store options in ETS so spider can retrieve them later
+      # (Crawly doesn't preserve request options in the response)
+      store_options(url, options)
+
       crawly_request = %Crawly.Request{url: url, options: options}
       do_fetch_with_retry(url, options, base_url, crawly_request, 0)
     end
