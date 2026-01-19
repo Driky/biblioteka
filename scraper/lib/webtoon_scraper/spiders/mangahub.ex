@@ -283,10 +283,15 @@ defmodule WebtoonScraper.Spiders.MangaHub do
 
   defp extract_expected_image_count(document) do
     # MangaHub shows page indicator like "1/25" in <p class="_3w1ww">
+    # Use List.first to avoid concatenating text from multiple page indicator elements
+    # (which was causing 10x inflated counts like "392" instead of "39")
     document
     |> Floki.find("p._3w1ww")
-    |> Floki.text()
-    |> parse_page_indicator()
+    |> List.first()
+    |> case do
+      nil -> nil
+      element -> element |> Floki.text() |> parse_page_indicator()
+    end
   end
 
   defp parse_page_indicator(text) when is_binary(text) do
