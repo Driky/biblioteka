@@ -9,6 +9,7 @@ defmodule WebtoonShared.Schema.WebtoonSource do
     field :site_id, :string
     field :source_url, :string
     field :enabled, :boolean, default: true
+    field :crawl_enabled, :boolean, default: true
     field :last_checked_at, :utc_datetime
     field :last_chapter_scraped, :decimal
 
@@ -18,7 +19,7 @@ defmodule WebtoonShared.Schema.WebtoonSource do
   end
 
   @required_fields [:site_id, :source_url]
-  @optional_fields [:webtoon_id, :enabled, :last_checked_at, :last_chapter_scraped]
+  @optional_fields [:webtoon_id, :enabled, :crawl_enabled, :last_checked_at, :last_chapter_scraped]
 
   def changeset(source, attrs) do
     source
