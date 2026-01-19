@@ -33,6 +33,9 @@ defmodule WebtoonScraper.MixProject do
       # Scheduling
       {:quantum, "~> 3.5"},
 
+      # Async job processing
+      {:oban, "~> 2.17"},
+
       # Image processing
       {:image, "~> 0.48"},
 

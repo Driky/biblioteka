@@ -9,6 +9,18 @@ config :webtoon_scraper,
   # This prevents overwhelming the target site and request storage
   max_chapters_per_run: 5
 
+# Oban configuration for async job processing
+config :webtoon_scraper, Oban,
+  repo: WebtoonShared.Repo,
+  queues: [
+    chapters: 5,      # 5 concurrent chapter processing jobs
+    default: 10
+  ],
+  plugins: [
+    Oban.Plugins.Pruner,  # Clean old jobs
+    {Oban.Plugins.Lifeline, rescue_after: :timer.minutes(30)}
+  ]
+
 # Crawly configuration
 config :crawly,
   # Fetcher configuration - use custom render server fetcher for JS-rendered pages
