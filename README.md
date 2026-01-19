@@ -8,18 +8,23 @@ A self-hosted webtoon/manga reader application with automated scraping capabilit
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │   Phoenix App   │────▶│   PostgreSQL    │◀────│    Scraper      │
 │   (LiveView)    │     │                 │     │   (Crawly)      │
-└────────┬────────┘     └─────────────────┘     └────────┬────────┘
-         │                                               │
-         │              ┌─────────────────┐              │
+└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
+         │                       │                       │
+         │              ┌────────┴────────┐              │
+         │              │      Oban       │◀─────────────┘
+         │              │  (Async Jobs)   │
+         │              └─────────────────┘
+         │              ┌─────────────────┐
          └─────────────▶│  Cloudflare R2  │◀─────────────┘
                         │  (Image CDN)    │
                         └─────────────────┘
 ```
 
-- **Phoenix App**: LiveView frontend for browsing and reading webtoons
+- **Phoenix App**: LiveView frontend for browsing and reading webtoons, plus admin back-office
 - **Scraper**: Crawly-based service that scrapes webtoon sites via headless Chrome
+- **Oban**: Background job processor for async chapter processing (prevents timeouts)
 - **Shared Library**: Common schemas, migrations, and R2 storage abstraction
-- **PostgreSQL**: Stores webtoon metadata, chapters, and reading progress
+- **PostgreSQL**: Stores webtoon metadata, chapters, reading progress, and job queues
 - **Cloudflare R2**: S3-compatible storage for chapter images
 
 ## Prerequisites
@@ -159,11 +164,32 @@ cd phoenix_app && mix test
 cd scraper && mix test
 ```
 
+## Admin Interface
+
+The application includes a back-office admin interface at `/admin` for managing webtoons and monitoring scraper activity.
+
+### Features
+
+- **Dashboard**: Overview of system stats (webtoons, chapters, images), active Oban jobs, and recent spider runs
+- **Webtoon Management**: List/create webtoons, toggle crawl per source, bulk mark chapters for rescrape
+- **Spider Management**: Enable/disable spiders, configure max chapters per run and request delay
+- **Run History**: View spider run history with detailed error logs and expandable stacktraces
+
+### Accessing Admin
+
+Visit http://localhost:4000/admin in development or https://yourdomain.com/admin in production.
+
 ## Running a Spider (Development)
 
-To run a spider, you need to set up the database records first, then start the spider.
+You can manage spiders via the admin interface at `/admin/spiders`, or manually via IEx.
 
-### 1. Create a Webtoon and Source
+### Option A: Via Admin Interface (Recommended)
+
+1. Visit http://localhost:4000/admin/webtoons
+2. Click "Add Webtoon" and enter the title and source URL
+3. Go to `/admin/spiders` to configure and monitor spiders
+
+### Option B: Via IEx Console
 
 Start an IEx session from the scraper directory:
 
@@ -226,6 +252,15 @@ Crawly.Engine.stop_spider(WebtoonScraper.Spiders.MangaHub)
 
 ### 4. Monitor Progress
 
+**Via Admin Dashboard (Recommended):**
+
+Visit http://localhost:4000/admin to see:
+- Active Oban jobs processing chapters
+- Spider run history with stats
+- Error logs with stacktraces
+
+**Via IEx:**
+
 ```elixir
 # Check scraped chapters
 alias WebtoonShared.Schema.Chapter
@@ -233,6 +268,9 @@ Repo.all(Chapter) |> length()
 
 # Check source status
 Repo.get(WebtoonSource, source.id) |> Map.take([:last_checked_at, :last_chapter_scraped])
+
+# Check Oban job queue
+Oban.Job |> Repo.all() |> Enum.group_by(& &1.state) |> Enum.map(fn {k, v} -> {k, length(v)} end)
 ```
 
 ## Adding a New Spider
@@ -417,6 +455,14 @@ Or use the deploy script:
 
 ## Monitoring
 
+### Admin Dashboard
+
+The easiest way to monitor the system is via the admin dashboard at `/admin`:
+
+- **Dashboard** (`/admin`): System stats, active jobs, recent runs
+- **Runs** (`/admin/runs`): Spider run history with filtering
+- **Run Details** (`/admin/runs/:id`): Per-run stats and error logs
+
 ### View Logs
 
 ```bash
@@ -434,7 +480,7 @@ docker compose logs -f scraper
 docker compose exec postgres psql -U webtoon -d webtoon_prod
 ```
 
-### Scraper Status
+### Scraper Status (IEx)
 
 Access the scraper's IEx console:
 
@@ -446,6 +492,11 @@ Crawly.Engine.running_spiders()
 
 # Manually trigger a spider
 WebtoonScraper.Runner.run_spider(WebtoonScraper.Spiders.MangaDex)
+
+# Check Oban jobs
+import Ecto.Query
+alias WebtoonShared.Repo
+from(j in Oban.Job, select: {j.state, count(j.id)}, group_by: j.state) |> Repo.all()
 ```
 
 ## Troubleshooting
