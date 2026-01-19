@@ -20,6 +20,7 @@ defmodule WebtoonScraper.Workers.ChapterWorker do
   alias WebtoonShared.Schema.{Chapter, ChapterImage}
   alias WebtoonShared.Storage
   alias WebtoonScraper.Sources
+  alias WebtoonScraper.SpiderRuns
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: args}) do
@@ -302,42 +303,15 @@ defmodule WebtoonScraper.Workers.ChapterWorker do
   end
 
   defp update_spider_run_stats(spider_run_id, image_count) do
-    # Update spider_runs table with progress
-    # This will be implemented when we create the SpiderRun schema
-    try do
-      from(r in "spider_runs",
-        where: r.id == ^spider_run_id,
-        update: [
-          inc: [chapters_processed: 1, images_downloaded: ^image_count]
-        ]
-      )
-      |> Repo.update_all([])
-    rescue
-      _ -> :ok
-    end
+    SpiderRuns.increment_stats(spider_run_id, 1, image_count)
   end
 
   defp record_error(spider_run_id, webtoon_id, chapter_number, reason) do
-    # Record error to spider_run_errors table
-    # This will be implemented when we create the SpiderRunError schema
-    try do
-      now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
-
-      Repo.insert_all("spider_run_errors", [
-        %{
-          id: Ecto.UUID.generate(),
-          spider_run_id: spider_run_id,
-          webtoon_id: webtoon_id,
-          chapter_number: chapter_number,
-          error_type: "processing_error",
-          error_message: inspect(reason),
-          occurred_at: now,
-          inserted_at: now,
-          updated_at: now
-        }
-      ])
-    rescue
-      _ -> :ok
-    end
+    SpiderRuns.record_error(spider_run_id, %{
+      webtoon_id: webtoon_id,
+      chapter_number: chapter_number,
+      error_type: "processing_error",
+      error_message: inspect(reason)
+    })
   end
 end

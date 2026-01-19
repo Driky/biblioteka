@@ -96,7 +96,9 @@ defmodule WebtoonScraper.Spiders.Base do
       end
 
       defp parse_webtoon_page(response, source) do
-        max_chapters = Application.get_env(:webtoon_scraper, :max_chapters_per_run, 20)
+        # Get max chapters from spider config (database) or fall back to app config
+        config = WebtoonScraper.SpiderRuns.get_config(site_id())
+        max_chapters = config.max_chapters_per_run
 
         # Parse chapter list from page
         chapters = parse_chapter_list(response)
