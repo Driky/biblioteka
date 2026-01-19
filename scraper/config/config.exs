@@ -59,6 +59,9 @@ config :crawly,
   ],
 
   pipelines: [
+    # Enqueue chapters for async processing via Oban
+    WebtoonScraper.Pipelines.Enqueue,
+    # Keep these for cover images only (they skip chapters)
     WebtoonScraper.Pipelines.ImageProcessor,
     WebtoonScraper.Pipelines.R2Upload,
     WebtoonScraper.Pipelines.DatabaseSave
