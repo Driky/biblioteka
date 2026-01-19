@@ -27,6 +27,22 @@ defmodule WebtoonWeb.Router do
     live "/webtoons/:slug/chapters/:number", ReaderLive, :show
   end
 
+  # Admin back-office routes
+  scope "/admin", WebtoonWeb.Admin do
+    pipe_through :browser
+
+    live "/", DashboardLive, :index
+    live "/webtoons", WebtoonLive.Index, :index
+    live "/webtoons/new", WebtoonLive.Index, :new
+    live "/webtoons/:id", WebtoonLive.Show, :show
+    live "/webtoons/:id/edit", WebtoonLive.Show, :edit
+    live "/spiders", SpiderLive.Index, :index
+    live "/spiders/:name", SpiderLive.Show, :show
+    live "/spiders/:name/runs", SpiderLive.Runs, :index
+    live "/runs", RunLive.Index, :index
+    live "/runs/:id", RunLive.Show, :show
+  end
+
   # Enable LiveDashboard in development
   if Application.compile_env(:webtoon_web, :dev_routes) do
     import Phoenix.LiveDashboard.Router

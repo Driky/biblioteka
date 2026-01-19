@@ -1,0 +1,47 @@
+<div class="min-h-screen bg-gray-100">
+  <!-- Sidebar -->
+  <aside class="fixed inset-y-0 left-0 w-64 bg-gray-800 text-white">
+    <div class="p-6">
+      <h1 class="text-xl font-bold">Admin Panel</h1>
+    </div>
+    <nav class="mt-4">
+      <.link
+        navigate={~p"/admin"}
+        class={"block px-6 py-3 hover:bg-gray-700 #{if @active_tab == :dashboard, do: "bg-gray-700 border-l-4 border-blue-500", else: ""}"}
+      >
+        Dashboard
+      </.link>
+      <.link
+        navigate={~p"/admin/webtoons"}
+        class={"block px-6 py-3 hover:bg-gray-700 #{if @active_tab == :webtoons, do: "bg-gray-700 border-l-4 border-blue-500", else: ""}"}
+      >
+        Webtoons
+      </.link>
+      <.link
+        navigate={~p"/admin/spiders"}
+        class={"block px-6 py-3 hover:bg-gray-700 #{if @active_tab == :spiders, do: "bg-gray-700 border-l-4 border-blue-500", else: ""}"}
+      >
+        Spiders
+      </.link>
+      <.link
+        navigate={~p"/admin/runs"}
+        class={"block px-6 py-3 hover:bg-gray-700 #{if @active_tab == :runs, do: "bg-gray-700 border-l-4 border-blue-500", else: ""}"}
+      >
+        Runs
+      </.link>
+    </nav>
+    <div class="absolute bottom-0 w-full p-6 border-t border-gray-700">
+      <.link navigate={~p"/"} class="text-gray-400 hover:text-white text-sm">
+        Back to Reader
+      </.link>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="ml-64">
+    <.flash_group flash={@flash} />
+    <div class="p-8">
+      {@inner_content}
+    </div>
+  </main>
+</div>
