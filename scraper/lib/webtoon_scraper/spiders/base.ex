@@ -111,18 +111,6 @@ defmodule WebtoonScraper.Spiders.Base do
           "#{length(new_chapters)} new chapters to scrape (max #{max_chapters} per run): [#{chapter_numbers}]"
         )
 
-        # Update chapters_found in the spider run record
-        if length(new_chapters) > 0 do
-          case WebtoonScraper.SpiderRuns.get_current_run_id(site_id()) do
-            nil ->
-              Logger.warning("No active run found for #{site_id()}, cannot update chapters_found")
-
-            run_id ->
-              WebtoonScraper.SpiderRuns.update_chapters_found(run_id, length(new_chapters))
-              Logger.debug("Updated chapters_found=#{length(new_chapters)} for run #{run_id}")
-          end
-        end
-
         # Mark source as checked even if no new chapters
         if Enum.empty?(new_chapters) do
           WebtoonScraper.Sources.touch_last_checked(source.id)
@@ -133,26 +121,44 @@ defmodule WebtoonScraper.Spiders.Base do
 
         # Create Oban jobs for each chapter instead of Crawly requests
         # This ensures reliable processing - jobs persist in DB and survive restarts
-        Enum.each(new_chapters, fn ch ->
-          job_args = %{
-            spider_module: to_string(__MODULE__),
-            chapter_url: ch.url,
-            webtoon_id: source.webtoon_id,
-            webtoon_slug: source.webtoon && source.webtoon.slug,
-            source_id: source.id,
-            chapter_number: Decimal.to_string(to_decimal(ch.chapter_number)),
-            chapter_title: ch.title,
-            spider_run_id: spider_run_id
-          }
+        jobs_created =
+          new_chapters
+          |> Enum.map(fn ch ->
+            job_args = %{
+              spider_module: to_string(__MODULE__),
+              chapter_url: ch.url,
+              webtoon_id: source.webtoon_id,
+              webtoon_slug: source.webtoon && source.webtoon.slug,
+              source_id: source.id,
+              chapter_number: Decimal.to_string(to_decimal(ch.chapter_number)),
+              chapter_title: ch.title,
+              spider_run_id: spider_run_id
+            }
 
-          case WebtoonScraper.Workers.ChapterFetchWorker.new(job_args) |> Oban.insert() do
-            {:ok, job} ->
-              Logger.info("Enqueued chapter #{ch.chapter_number} as Oban job #{job.id}")
+            case WebtoonScraper.Workers.ChapterFetchWorker.new(job_args) |> Oban.insert() do
+              {:ok, job} ->
+                Logger.info("Enqueued chapter #{ch.chapter_number} as Oban job #{job.id}")
+                1
 
-            {:error, reason} ->
-              Logger.error("Failed to enqueue chapter #{ch.chapter_number}: #{inspect(reason)}")
-          end
-        end)
+              {:error, reason} ->
+                Logger.error("Failed to enqueue chapter #{ch.chapter_number}: #{inspect(reason)}")
+                0
+            end
+          end)
+          |> Enum.sum()
+
+        # Update discovery metrics in the spider run record
+        if spider_run_id do
+          WebtoonScraper.SpiderRuns.update_discovery_metrics(
+            spider_run_id,
+            length(new_chapters),
+            jobs_created
+          )
+
+          Logger.info(
+            "Updated run #{spider_run_id}: chapters_found=#{length(new_chapters)}, jobs_total=#{jobs_created}"
+          )
+        end
 
         # Include cover item if we found one and webtoon doesn't have a cover yet
         # No requests - chapter processing is handled by Oban jobs

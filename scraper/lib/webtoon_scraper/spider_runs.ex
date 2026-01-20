@@ -1,7 +1,14 @@
 defmodule WebtoonScraper.SpiderRuns do
   @moduledoc """
   Context module for tracking spider runs.
-  Provides functions to create, update, and complete spider runs.
+
+  Run lifecycle:
+  1. `running` - Crawly is discovering chapters
+  2. `processing` - Discovery complete, Oban jobs are processing chapters
+  3. `completed` - All jobs finished successfully
+  4. `completed_with_errors` - All jobs finished, some failed
+  5. `failed` - Critical failure during discovery
+
   Uses RunTracker GenServer for ETS-backed run ID storage.
   """
 
@@ -20,6 +27,7 @@ defmodule WebtoonScraper.SpiderRuns do
   """
   def start_run(spider_name, crawl_id \\ nil) do
     Logger.info("SpiderRuns.start_run called for #{spider_name}")
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     result =
       %SpiderRun{}
@@ -27,7 +35,8 @@ defmodule WebtoonScraper.SpiderRuns do
         spider_name: spider_name,
         crawl_id: crawl_id,
         status: "running",
-        started_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        started_at: now,
+        discovery_started_at: now
       })
       |> Repo.insert()
 
@@ -74,7 +83,155 @@ defmodule WebtoonScraper.SpiderRuns do
   end
 
   @doc """
-  Updates the chapters_found count for a run.
+  Updates discovery metrics: chapters_found and jobs_total.
+  Called when the spider finishes discovering chapters.
+  """
+  def update_discovery_metrics(run_id, chapters_found, jobs_total) do
+    SpiderRun
+    |> Repo.get(run_id)
+    |> case do
+      nil ->
+        {:error, :not_found}
+
+      run ->
+        run
+        |> SpiderRun.changeset(%{
+          chapters_found: chapters_found,
+          jobs_total: jobs_total
+        })
+        |> Repo.update()
+    end
+  end
+
+  @doc """
+  Marks discovery as complete and transitions to 'processing' status.
+  Called when Crawly finishes and Oban jobs are created.
+  """
+  def complete_discovery(spider_name) do
+    case get_current_run_id(spider_name) do
+      nil ->
+        {:error, :no_active_run}
+
+      run_id ->
+        now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+        SpiderRun
+        |> Repo.get(run_id)
+        |> case do
+          nil ->
+            {:error, :not_found}
+
+          run ->
+            # If no jobs were created, mark as completed immediately
+            new_status = if run.jobs_total == 0, do: "completed", else: "processing"
+
+            run
+            |> SpiderRun.changeset(%{
+              status: new_status,
+              discovery_completed_at: now,
+              completed_at: if(new_status == "completed", do: now, else: nil)
+            })
+            |> Repo.update()
+        end
+    end
+  end
+
+  @doc """
+  Records a completed job and updates run metrics.
+  Checks if all jobs are done and updates final status.
+  """
+  def record_job_completed(run_id, job_metrics) do
+    %{
+      execution_time_ms: execution_time_ms,
+      images_found: images_found,
+      images_downloaded: images_downloaded,
+      images_uploaded: images_uploaded
+    } = job_metrics
+
+    # Atomically increment counters
+    {1, [run]} =
+      from(r in SpiderRun,
+        where: r.id == ^run_id,
+        update: [
+          inc: [
+            jobs_completed: 1,
+            chapters_processed: 1,
+            images_found: ^images_found,
+            images_downloaded: ^images_downloaded,
+            images_uploaded: ^images_uploaded,
+            total_execution_time_ms: ^execution_time_ms
+          ]
+        ],
+        select: r
+      )
+      |> Repo.update_all([])
+
+    # Check if all jobs are done
+    check_run_completion(run)
+  end
+
+  @doc """
+  Records a failed job and updates run metrics.
+  Checks if all jobs are done and updates final status.
+  """
+  def record_job_failed(run_id, error_message) do
+    # Atomically increment failure counter and set last_error
+    {1, [run]} =
+      from(r in SpiderRun,
+        where: r.id == ^run_id,
+        update: [
+          inc: [jobs_failed: 1, errors_count: 1],
+          set: [last_error: ^error_message]
+        ],
+        select: r
+      )
+      |> Repo.update_all([])
+
+    # Check if all jobs are done
+    check_run_completion(run)
+  end
+
+  defp check_run_completion(run) do
+    # run already has updated counts from update_all with select
+    total_finished = run.jobs_completed + run.jobs_failed
+
+    if total_finished >= run.jobs_total and run.jobs_total > 0 do
+      finalize_run(run.id)
+    else
+      {:ok, run}
+    end
+  end
+
+  defp finalize_run(run_id) do
+    run = Repo.get(SpiderRun, run_id)
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    # Determine final status based on job results
+    final_status =
+      cond do
+        run.jobs_failed == 0 -> "completed"
+        run.jobs_completed == 0 -> "failed"
+        true -> "completed_with_errors"
+      end
+
+    Logger.info(
+      "Finalizing run #{run_id}: #{run.jobs_completed} completed, #{run.jobs_failed} failed -> #{final_status}"
+    )
+
+    # Clear from RunTracker
+    WebtoonScraper.RunTracker.clear_run(run.spider_name)
+
+    run
+    |> SpiderRun.changeset(%{
+      status: final_status,
+      completed_at: now
+    })
+    |> Repo.update()
+  end
+
+  @doc """
+  Legacy function - updates chapters_found count for a run.
+  Use update_discovery_metrics/3 for new code.
   """
   def update_chapters_found(run_id, count) do
     SpiderRun
@@ -86,8 +243,21 @@ defmodule WebtoonScraper.SpiderRuns do
   end
 
   @doc """
-  Increments chapters_processed and images_downloaded for a run.
-  Called by ChapterWorker after successful processing.
+  Sets the jobs_total count for a run.
+  Called after all Oban jobs have been created.
+  """
+  def set_jobs_total(run_id, count) do
+    SpiderRun
+    |> Repo.get(run_id)
+    |> case do
+      nil -> {:error, :not_found}
+      run -> run |> SpiderRun.changeset(%{jobs_total: count}) |> Repo.update()
+    end
+  end
+
+  @doc """
+  Legacy function - increments chapters_processed and images_downloaded.
+  Use record_job_completed/2 for new code.
   """
   def increment_stats(run_id, chapters \\ 1, images \\ 0) do
     from(r in SpiderRun,
@@ -112,7 +282,8 @@ defmodule WebtoonScraper.SpiderRuns do
 
   @doc """
   Completes a spider run with the given status.
-  Removes the run from ETS tracking.
+  Used for immediate completion (e.g., failed discovery).
+  For normal completion, use complete_discovery/1 and let job completion handle the rest.
   """
   def complete_run(spider_name, status \\ "completed") do
     case get_current_run_id(spider_name) do
@@ -130,10 +301,13 @@ defmodule WebtoonScraper.SpiderRuns do
             {:error, :not_found}
 
           run ->
+            now = DateTime.utc_now() |> DateTime.truncate(:second)
+
             run
             |> SpiderRun.changeset(%{
               status: status,
-              completed_at: DateTime.utc_now() |> DateTime.truncate(:second)
+              completed_at: now,
+              discovery_completed_at: run.discovery_completed_at || now
             })
             |> Repo.update()
         end

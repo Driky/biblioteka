@@ -112,8 +112,9 @@ defmodule WebtoonScraper.RunTracker do
     |> Enum.each(fn
       {spider_name, run_id, spider_module} when not is_nil(spider_module) ->
         if spider_module not in running_spider_modules do
-          Logger.info("RunTracker: Spider #{spider_name} (#{spider_module}) finished, completing run #{run_id}")
-          WebtoonScraper.SpiderRuns.complete_run(spider_name, "completed")
+          Logger.info("RunTracker: Spider #{spider_name} (#{spider_module}) finished discovery, transitioning run #{run_id} to processing")
+          # Transition to processing - actual completion happens when all Oban jobs are done
+          WebtoonScraper.SpiderRuns.complete_discovery(spider_name)
         else
           Logger.debug("RunTracker: Spider #{spider_name} still running")
         end

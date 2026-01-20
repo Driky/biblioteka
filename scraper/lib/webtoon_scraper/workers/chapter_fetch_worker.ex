@@ -31,6 +31,8 @@ defmodule WebtoonScraper.Workers.ChapterFetchWorker do
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: args}) do
+    start_time = System.monotonic_time(:millisecond)
+
     %{
       "spider_module" => spider_module_str,
       "chapter_url" => chapter_url,
@@ -51,43 +53,63 @@ defmodule WebtoonScraper.Workers.ChapterFetchWorker do
     # Get the spider module for parsing
     spider_module = String.to_existing_atom(spider_module_str)
 
-    with {:ok, html} <- fetch_chapter_page(chapter_url),
-         {:ok, images} <- extract_images(spider_module, html, chapter_url),
-         {:ok, processed_images} <- download_images(images, spider_module),
-         {:ok, uploaded_images} <- upload_images(processed_images, webtoon_slug, chapter_number),
-         {:ok, _chapter} <-
-           save_to_database(
-             webtoon_id,
-             source_id,
-             chapter_number,
-             chapter_title,
-             chapter_url,
-             uploaded_images
-           ) do
-      # Update spider run stats if tracking
-      if spider_run_id do
-        Logger.info(
-          "ChapterFetchWorker: Updating stats for run #{spider_run_id}: +1 chapter, +#{length(uploaded_images)} images"
-        )
+    # Track metrics throughout the pipeline using a nested approach
+    result =
+      with {:ok, html} <- fetch_chapter_page(chapter_url),
+           {:ok, images} <- extract_images(spider_module, html, chapter_url),
+           {:ok, processed_images} <- download_images(images, spider_module),
+           {:ok, uploaded_images} <- upload_images(processed_images, webtoon_slug, chapter_number),
+           {:ok, _chapter} <-
+             save_to_database(
+               webtoon_id,
+               source_id,
+               chapter_number,
+               chapter_title,
+               chapter_url,
+               uploaded_images
+             ) do
+        # Build metrics from the results
+        metrics = %{
+          images_found: length(images),
+          images_downloaded: length(processed_images),
+          images_uploaded: length(uploaded_images)
+        }
 
-        SpiderRuns.increment_stats(spider_run_id, 1, length(uploaded_images))
+        {:ok, metrics}
       end
 
-      Logger.info("ChapterFetchWorker: Completed chapter #{chapter_number_str}")
-      :ok
-    else
+    execution_time_ms = System.monotonic_time(:millisecond) - start_time
+
+    case result do
+      {:ok, final_metrics} ->
+        # Report job completion with metrics
+        if spider_run_id do
+          job_metrics = %{
+            execution_time_ms: execution_time_ms,
+            images_found: final_metrics.images_found,
+            images_downloaded: final_metrics.images_downloaded,
+            images_uploaded: final_metrics.images_uploaded
+          }
+
+          Logger.info(
+            "ChapterFetchWorker: Completed chapter #{chapter_number_str} in #{execution_time_ms}ms - " <>
+              "found: #{final_metrics.images_found}, downloaded: #{final_metrics.images_downloaded}, uploaded: #{final_metrics.images_uploaded}"
+          )
+
+          SpiderRuns.record_job_completed(spider_run_id, job_metrics)
+        else
+          Logger.info("ChapterFetchWorker: Completed chapter #{chapter_number_str} (no run tracking)")
+        end
+
+        :ok
+
       {:error, reason} ->
         Logger.error(
-          "ChapterFetchWorker: Failed for chapter #{chapter_number_str}: #{inspect(reason)}"
+          "ChapterFetchWorker: Failed for chapter #{chapter_number_str} after #{execution_time_ms}ms: #{inspect(reason)}"
         )
 
         if spider_run_id do
-          SpiderRuns.record_error(spider_run_id, %{
-            webtoon_id: webtoon_id,
-            chapter_number: chapter_number,
-            error_type: "fetch_error",
-            error_message: inspect(reason)
-          })
+          SpiderRuns.record_job_failed(spider_run_id, inspect(reason))
         end
 
         {:error, reason}
