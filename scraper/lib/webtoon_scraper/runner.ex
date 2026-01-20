@@ -8,6 +8,7 @@ defmodule WebtoonScraper.Runner do
   require Logger
 
   alias WebtoonScraper.SpiderRuns
+  alias WebtoonScraper.RunTracker
 
   @doc """
   Runs a spider if it's not already running.
@@ -40,8 +41,8 @@ defmodule WebtoonScraper.Runner do
         case Crawly.Engine.start_spider(spider_module) do
           {:ok, _pid} ->
             Logger.info("#{spider_module} started successfully")
-            # Schedule run completion check
-            schedule_run_completion_check(spider_module, spider_name)
+            # Register with RunTracker for automatic completion detection
+            RunTracker.track_completion(spider_name, spider_module)
             :ok
 
           {:error, reason} ->
@@ -92,33 +93,6 @@ defmodule WebtoonScraper.Runner do
       |> Module.split()
       |> List.last()
       |> Macro.underscore()
-    end
-  end
-
-  # Schedules a check to see if the spider has finished
-  # This is needed because Crawly doesn't provide a clean callback for spider completion
-  defp schedule_run_completion_check(spider_module, spider_name) do
-    Task.start(fn ->
-      check_spider_completion(spider_module, spider_name, 0)
-    end)
-  end
-
-  defp check_spider_completion(spider_module, spider_name, checks) do
-    # Check every 10 seconds for up to 2 hours (720 checks)
-    max_checks = 720
-
-    if checks >= max_checks do
-      Logger.warning("Spider #{spider_name} run check timed out after #{max_checks * 10}s")
-      SpiderRuns.complete_run(spider_name, "completed")
-    else
-      Process.sleep(10_000)
-
-      if spider_running?(spider_module) do
-        check_spider_completion(spider_module, spider_name, checks + 1)
-      else
-        Logger.info("Spider #{spider_name} finished, completing run")
-        SpiderRuns.complete_run(spider_name, "completed")
-      end
     end
   end
 end

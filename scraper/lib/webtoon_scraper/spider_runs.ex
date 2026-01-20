@@ -2,7 +2,7 @@ defmodule WebtoonScraper.SpiderRuns do
   @moduledoc """
   Context module for tracking spider runs.
   Provides functions to create, update, and complete spider runs.
-  Uses ETS to store the current run ID per spider for access during crawl.
+  Uses RunTracker GenServer for ETS-backed run ID storage.
   """
 
   import Ecto.Query
@@ -10,21 +10,14 @@ defmodule WebtoonScraper.SpiderRuns do
   alias WebtoonShared.Repo
   alias WebtoonShared.Schema.{SpiderRun, SpiderRunError}
 
-  @ets_table :spider_run_tracking
-
-  def init_ets do
-    if :ets.whereis(@ets_table) == :undefined do
-      :ets.new(@ets_table, [:named_table, :public, :set])
-    end
-  end
+  # Legacy function - kept for backward compatibility
+  def init_ets, do: :ok
 
   @doc """
   Creates a new spider run and stores it for the given spider name.
   Returns {:ok, run} or {:error, changeset}.
   """
   def start_run(spider_name, crawl_id \\ nil) do
-    init_ets()
-
     result =
       %SpiderRun{}
       |> SpiderRun.changeset(%{
@@ -37,7 +30,8 @@ defmodule WebtoonScraper.SpiderRuns do
 
     case result do
       {:ok, run} ->
-        :ets.insert(@ets_table, {spider_name, run.id})
+        # Store in RunTracker's ETS table
+        WebtoonScraper.RunTracker.store_run(spider_name, run.id)
         # Also update spider config last_run_at
         update_config_last_run(spider_name)
         {:ok, run}
@@ -51,12 +45,7 @@ defmodule WebtoonScraper.SpiderRuns do
   Gets the current run ID for a spider name from ETS.
   """
   def get_current_run_id(spider_name) do
-    init_ets()
-
-    case :ets.lookup(@ets_table, spider_name) do
-      [{^spider_name, run_id}] -> run_id
-      [] -> nil
-    end
+    WebtoonScraper.RunTracker.get_run_id(spider_name)
   end
 
   @doc """
@@ -101,14 +90,13 @@ defmodule WebtoonScraper.SpiderRuns do
   Removes the run from ETS tracking.
   """
   def complete_run(spider_name, status \\ "completed") do
-    init_ets()
-
     case get_current_run_id(spider_name) do
       nil ->
         {:error, :no_active_run}
 
       run_id ->
-        :ets.delete(@ets_table, spider_name)
+        # Clear from RunTracker
+        WebtoonScraper.RunTracker.clear_run(spider_name)
 
         SpiderRun
         |> Repo.get(run_id)
