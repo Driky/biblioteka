@@ -6,6 +6,7 @@ defmodule WebtoonWeb.Admin.WebtoonLive.Index do
   use WebtoonWeb, :live_view
 
   alias Webtoon.Admin
+  alias WebtoonShared.Schema.Webtoon
 
   @impl true
   def mount(_params, _session, socket) do
@@ -44,7 +45,7 @@ defmodule WebtoonWeb.Admin.WebtoonLive.Index do
 
   @impl true
   def handle_event("create_webtoon", %{"title" => title, "source_url" => source_url, "site_id" => site_id}, socket) do
-    slug = Slug.slugify(title)
+    slug = Webtoon.generate_slug(title)
 
     case Admin.create_webtoon(%{title: title, slug: slug}) do
       {:ok, webtoon} ->
