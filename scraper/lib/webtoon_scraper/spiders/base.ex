@@ -59,40 +59,15 @@ defmodule WebtoonScraper.Spiders.Base do
 
       @impl Crawly.Spider
       def parse_item(response) do
-        # Check if this is a chapter page first (has metadata in options)
-        if is_chapter_page?(response) do
-          parse_chapter_page(response)
+        # Spider only handles webtoon pages - chapter processing is done by Oban jobs
+        source = WebtoonScraper.Sources.get_by_url(response.request_url)
+
+        if is_nil(source) do
+          Logger.warning("No source found for URL: #{response.request_url}")
+          %Crawly.ParsedItem{items: [], requests: []}
         else
-          # For webtoon pages, look up source by URL
-          source = WebtoonScraper.Sources.get_by_url(response.request_url)
-
-          if is_nil(source) do
-            Logger.warning("No source found for URL: #{response.request_url}")
-            %Crawly.ParsedItem{items: [], requests: []}
-          else
-            parse_webtoon_page(response, source)
-          end
+          parse_webtoon_page(response, source)
         end
-      end
-
-      defp is_chapter_page?(response) do
-        # Check if this is a chapter page by looking at options in the request
-        # Handle case where request or options might be nil
-        options =
-          case response do
-            %{request: %{options: opts}} when is_list(opts) -> opts
-            %{request: %Crawly.Request{options: opts}} when is_list(opts) -> opts
-            _ -> []
-          end
-
-        has_chapter_option = Keyword.has_key?(options, :chapter_number)
-
-        # Fallback: check URL pattern if options aren't available
-        # (happens when using custom fetcher that doesn't preserve request)
-        url = response.request_url || ""
-        is_chapter_url = String.contains?(url, "/chapter/")
-
-        has_chapter_option || is_chapter_url
       end
 
       defp parse_webtoon_page(response, source) do
@@ -153,38 +128,37 @@ defmodule WebtoonScraper.Spiders.Base do
           WebtoonScraper.Sources.touch_last_checked(source.id)
         end
 
-        # Generate requests for new chapter pages
-        # Reverse the list so that when Crawly processes LIFO, smallest chapters are handled first
-        requests =
-          new_chapters
-          |> Enum.map(fn ch ->
-            request = Crawly.Utils.request_from_url(ch.url)
+        # Get spider run ID for job tracking
+        spider_run_id = WebtoonScraper.SpiderRuns.get_current_run_id(site_id())
 
-            # Store chapter metadata in the options field
-            # Enable scrolling for chapter pages (lazy-loaded images)
-            chapter_options = [
-              source_id: source.id,
-              webtoon_id: source.webtoon_id,
-              webtoon_slug: source.webtoon && source.webtoon.slug,
-              chapter_number: to_decimal(ch.chapter_number),
-              chapter_title: ch.title,
-              source_url: ch.url,
-              scroll: true
-            ]
+        # Create Oban jobs for each chapter instead of Crawly requests
+        # This ensures reliable processing - jobs persist in DB and survive restarts
+        Enum.each(new_chapters, fn ch ->
+          job_args = %{
+            spider_module: to_string(__MODULE__),
+            chapter_url: ch.url,
+            webtoon_id: source.webtoon_id,
+            webtoon_slug: source.webtoon && source.webtoon.slug,
+            source_id: source.id,
+            chapter_number: Decimal.to_string(to_decimal(ch.chapter_number)),
+            chapter_title: ch.title,
+            spider_run_id: spider_run_id
+          }
 
-            Logger.debug("Creating request for chapter #{ch.chapter_number}: #{ch.url}")
-            %{request | options: chapter_options}
-          end)
+          case WebtoonScraper.Workers.ChapterFetchWorker.new(job_args) |> Oban.insert() do
+            {:ok, job} ->
+              Logger.info("Enqueued chapter #{ch.chapter_number} as Oban job #{job.id}")
 
-        # Log the request order before and after reverse
-        Logger.info("Request order before reverse: #{requests |> Enum.map(&Keyword.get(&1.options, :chapter_number)) |> Enum.map(&Decimal.to_string/1) |> Enum.join(", ")}")
-        requests = Enum.reverse(requests)
-        Logger.info("Request order after reverse (Crawly LIFO will process last first): #{requests |> Enum.map(&Keyword.get(&1.options, :chapter_number)) |> Enum.map(&Decimal.to_string/1) |> Enum.join(", ")}")
+            {:error, reason} ->
+              Logger.error("Failed to enqueue chapter #{ch.chapter_number}: #{inspect(reason)}")
+          end
+        end)
 
         # Include cover item if we found one and webtoon doesn't have a cover yet
+        # No requests - chapter processing is handled by Oban jobs
         items = if cover_item, do: [cover_item], else: []
 
-        %Crawly.ParsedItem{items: items, requests: requests}
+        %Crawly.ParsedItem{items: items, requests: []}
       end
 
       defp extract_cover_image(response, source) do
@@ -230,83 +204,6 @@ defmodule WebtoonScraper.Spiders.Base do
         end
       end
 
-      defp parse_chapter_page(response) do
-        url = response.request_url || ""
-        Logger.info(">>> parse_chapter_page called for URL: #{url}")
-
-        # Try to get options from response.request first (standard Crawly way)
-        # Fall back to ETS if not available
-        opts =
-          case response do
-            %{request: %Crawly.Request{options: o}} when is_list(o) and o != [] -> o
-            %{request: %{options: o}} when is_list(o) and o != [] -> o
-            _ ->
-              # Fallback to ETS storage
-              WebtoonScraper.Fetchers.RenderServer.get_options(url)
-          end
-
-        # Extract chapter metadata from options
-        chapter_number = Keyword.get(opts, :chapter_number) || extract_chapter_number_from_url(url)
-        Logger.info(">>> Processing chapter #{inspect(chapter_number)} from URL: #{url}")
-        chapter_title = Keyword.get(opts, :chapter_title)
-        source_id = Keyword.get(opts, :source_id)
-        webtoon_id = Keyword.get(opts, :webtoon_id)
-        webtoon_slug = Keyword.get(opts, :webtoon_slug)
-        source_url = Keyword.get(opts, :source_url) || url
-
-        # If we don't have webtoon_id, try to look it up from the URL
-        {webtoon_id, webtoon_slug, source_id} =
-          if is_nil(webtoon_id) do
-            lookup_webtoon_from_chapter_url(url)
-          else
-            {webtoon_id, webtoon_slug, source_id}
-          end
-
-        Logger.info(
-          "Parsing chapter #{inspect(chapter_number)} images from #{url}"
-        )
-        Logger.debug("Chapter metadata - webtoon_id: #{inspect(webtoon_id)}, source_id: #{inspect(source_id)}, title: #{inspect(chapter_title)}")
-        Logger.debug("Options keys: #{inspect(Keyword.keys(opts))}")
-
-        # Parse images from page
-        raw_images = parse_chapter_images(response)
-
-        # Normalize image info
-        images =
-          raw_images
-          |> Enum.with_index(1)
-          |> Enum.map(fn {img, seq} ->
-            {url, headers} =
-              case img do
-                %{url: url, headers: headers} -> {url, headers}
-                url when is_binary(url) -> {url, get_image_headers(url)}
-              end
-
-            %{
-              url: url,
-              headers: headers,
-              sequence: seq
-            }
-          end)
-
-        Logger.info("Found #{length(images)} images in chapter #{chapter_number}")
-
-        # Create single item for the chapter with all images
-        item = %{
-          type: :chapter,
-          webtoon_id: webtoon_id,
-          webtoon_slug: webtoon_slug,
-          source_id: source_id,
-          chapter_number: chapter_number,
-          chapter_title: chapter_title,
-          source_url: source_url,
-          images: images
-        }
-
-        Logger.info(">>> Returning ParsedItem for chapter #{chapter_number} with #{length(images)} images")
-        %Crawly.ParsedItem{items: [item], requests: []}
-      end
-
       defp get_image_headers(url) do
         # Use apply/3 to avoid compile-time warning about undefined function
         if function_exported?(__MODULE__, :image_headers, 1) do
@@ -326,53 +223,6 @@ defmodule WebtoonScraper.Spiders.Base do
           :error -> Decimal.new(0)
         end
       end
-
-      # Extract chapter number from URL like /chapter/manga-name/chapter-123
-      defp extract_chapter_number_from_url(url) when is_binary(url) do
-        case Regex.run(~r/chapter[_-]?(\d+(?:\.\d+)?)/i, url) do
-          [_, num_str] ->
-            case Decimal.parse(num_str) do
-              {decimal, _} -> decimal
-              :error -> nil
-            end
-
-          _ ->
-            nil
-        end
-      end
-
-      defp extract_chapter_number_from_url(_), do: nil
-
-      # Look up webtoon info from chapter URL by finding source with matching base URL
-      defp lookup_webtoon_from_chapter_url(chapter_url) when is_binary(chapter_url) do
-        # Extract the manga identifier from URL
-        # e.g., /chapter/solo-leveling_105/chapter-4 -> solo-leveling_105
-        case Regex.run(~r{/chapter/([^/]+)/}, chapter_url) do
-          [_, manga_slug] ->
-            # Try to find source by matching URL pattern
-            import Ecto.Query
-
-            source =
-              WebtoonShared.Schema.WebtoonSource
-              |> where([s], like(s.source_url, ^"%#{manga_slug}%"))
-              |> preload(:webtoon)
-              |> WebtoonShared.Repo.one()
-
-            if source do
-              Logger.debug("Found source for chapter URL: #{chapter_url} -> #{source.webtoon && source.webtoon.title}")
-              {source.webtoon_id, source.webtoon && source.webtoon.slug, source.id}
-            else
-              Logger.warning("Could not find source for chapter URL: #{chapter_url}")
-              {nil, nil, nil}
-            end
-
-          _ ->
-            Logger.warning("Could not extract manga slug from URL: #{chapter_url}")
-            {nil, nil, nil}
-        end
-      end
-
-      defp lookup_webtoon_from_chapter_url(_), do: {nil, nil, nil}
 
       # Allow override
       defoverridable init: 0

@@ -55,7 +55,10 @@ defmodule WebtoonWeb.MixProject do
       {:dns_cluster, "~> 0.1"},
 
       # Environment variables from .env files
-      {:dotenvy, "~> 0.8"}
+      {:dotenvy, "~> 0.8"},
+
+      # Oban for job monitoring in LiveDashboard
+      {:oban, "~> 2.18"}
     ]
   end
 

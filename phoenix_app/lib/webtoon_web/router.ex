@@ -43,14 +43,25 @@ defmodule WebtoonWeb.Router do
     live "/runs/:id", RunLive.Show, :show
   end
 
-  # Enable LiveDashboard in development
-  if Application.compile_env(:webtoon_web, :dev_routes) do
-    import Phoenix.LiveDashboard.Router
+  # LiveDashboard with Oban monitoring - available in admin for all environments
+  import Phoenix.LiveDashboard.Router
 
+  scope "/admin" do
+    pipe_through :browser
+
+    live_dashboard "/dashboard",
+      metrics: WebtoonWeb.Telemetry,
+      additional_pages: [
+        oban: Oban.LiveDashboard
+      ]
+  end
+
+  # Enable additional dev routes in development
+  if Application.compile_env(:webtoon_web, :dev_routes) do
     scope "/dev" do
       pipe_through :browser
 
-      live_dashboard "/dashboard", metrics: WebtoonWeb.Telemetry
+      live_dashboard "/dev-dashboard", metrics: WebtoonWeb.Telemetry
     end
   end
 end

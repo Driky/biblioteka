@@ -13,7 +13,9 @@ config :webtoon_scraper,
 config :webtoon_scraper, Oban,
   repo: WebtoonShared.Repo,
   queues: [
-    chapters: 5,      # 5 concurrent chapter processing jobs
+    # Chapter fetching: includes rendering page + downloading/uploading images
+    # Keep concurrency low to avoid overwhelming render server and target sites
+    chapter_fetch: 2,
     default: 10
   ],
   plugins: [
@@ -43,17 +45,11 @@ config :crawly,
   # Increase manager timeout for storing many requests
   manager_operations_timeout: 30_000,
 
-  # Wait 3 minutes after spider becomes idle before shutting down
-  # This ensures in-flight HTTP requests have time to complete
-  closespider_timeout: 180_000,
-
   # Note: Retries are handled by our custom RenderServer fetcher
   # to avoid conflicts with Crawly's request deduplication
 
   middlewares: [
     Crawly.Middlewares.DomainFilter,
-    # Note: UniqueRequest removed - it blocks retries and we have our own
-    # chapter filtering logic that prevents duplicate chapter scraping
     {Crawly.Middlewares.UserAgent,
      user_agents: [
        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:134.0) Gecko/20100101 Firefox/134.0",
@@ -62,10 +58,9 @@ config :crawly,
      ]}
   ],
 
+  # Pipelines for cover images only
+  # Chapter processing is handled by Oban jobs (ChapterFetchWorker)
   pipelines: [
-    # Enqueue chapters for async processing via Oban
-    WebtoonScraper.Pipelines.Enqueue,
-    # Keep these for cover images only (they skip chapters)
     WebtoonScraper.Pipelines.ImageProcessor,
     WebtoonScraper.Pipelines.R2Upload,
     WebtoonScraper.Pipelines.DatabaseSave
