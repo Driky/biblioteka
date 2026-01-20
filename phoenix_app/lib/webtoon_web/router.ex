@@ -51,4 +51,13 @@ defmodule WebtoonWeb.Router do
 
     oban_dashboard "/jobs"
   end
+
+  # Phoenix LiveDashboard for system metrics
+  import Phoenix.LiveDashboard.Router
+
+  scope "/admin" do
+    pipe_through :browser
+
+    live_dashboard "/dashboard", metrics: WebtoonWeb.Telemetry
+  end
 end
