@@ -48,5 +48,11 @@ config :logger, :console,
 # Use Jason for JSON parsing
 config :phoenix, :json_library, Jason
 
+# Oban configuration - mirrors scraper config so Oban Web can monitor jobs
+config :webtoon_web, Oban,
+  repo: WebtoonShared.Repo,
+  queues: false,  # Don't process jobs in the web app, just monitor
+  plugins: false  # Disable plugins in web app
+
 # Import environment specific config
 import_config "#{config_env()}.exs"

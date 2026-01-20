@@ -10,6 +10,8 @@ defmodule WebtoonWeb.Application do
       WebtoonWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:webtoon_web, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: WebtoonWeb.PubSub},
+      # Oban for Oban Web dashboard (monitor only, no job processing)
+      {Oban, Application.fetch_env!(:webtoon_web, Oban)},
       WebtoonWeb.Endpoint
     ]
 
