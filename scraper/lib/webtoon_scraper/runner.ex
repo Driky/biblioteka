@@ -41,6 +41,12 @@ defmodule WebtoonScraper.Runner do
         Logger.info("Starting #{spider_module}")
 
         case Crawly.Engine.start_spider(spider_module) do
+          :ok ->
+            Logger.info("#{spider_module} started successfully")
+            # Register with RunTracker for automatic completion detection
+            RunTracker.track_completion(spider_name, spider_module)
+            :ok
+
           {:ok, _pid} ->
             Logger.info("#{spider_module} started successfully")
             # Register with RunTracker for automatic completion detection
@@ -75,14 +81,15 @@ defmodule WebtoonScraper.Runner do
   end
 
   @doc """
-  Returns the list of currently running spiders.
+  Returns the map of currently running spiders.
   """
   def running_spiders do
     Crawly.Engine.running_spiders()
   end
 
   defp spider_running?(spider_module) do
-    spider_module in running_spiders()
+    # Crawly.Engine.running_spiders() returns a map like %{SpiderModule => {pid, crawl_id}}
+    Map.has_key?(running_spiders(), spider_module)
   end
 
   defp get_spider_name(spider_module) do

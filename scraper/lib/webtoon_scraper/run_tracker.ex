@@ -94,17 +94,19 @@ defmodule WebtoonScraper.RunTracker do
   end
 
   defp check_all_completions do
-    running_spiders = Crawly.Engine.running_spiders()
+    # Crawly.Engine.running_spiders() returns a map like %{SpiderModule => {pid, crawl_id}}
+    running_spiders_map = Crawly.Engine.running_spiders()
+    running_spider_modules = Map.keys(running_spiders_map)
     tracked_runs = :ets.tab2list(@ets_table)
 
     if length(tracked_runs) > 0 do
-      Logger.debug("RunTracker: Checking #{length(tracked_runs)} tracked runs, running_spiders=#{inspect(running_spiders)}")
+      Logger.debug("RunTracker: Checking #{length(tracked_runs)} tracked runs, running_spiders=#{inspect(running_spider_modules)}")
     end
 
     tracked_runs
     |> Enum.each(fn
       {spider_name, run_id, spider_module} when not is_nil(spider_module) ->
-        if spider_module not in running_spiders do
+        if spider_module not in running_spider_modules do
           Logger.info("RunTracker: Spider #{spider_name} (#{spider_module}) finished, completing run #{run_id}")
           WebtoonScraper.SpiderRuns.complete_run(spider_name, "completed")
           :ets.delete(@ets_table, spider_name)
