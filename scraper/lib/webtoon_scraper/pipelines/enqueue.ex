@@ -69,12 +69,15 @@ defmodule WebtoonScraper.Pipelines.Enqueue do
     case Map.get(state, :spider_run_id) do
       nil ->
         # Fall back to looking up by spider name from the item's source
-        # or from state
-        spider_name =
+        # or from state. Note: Crawly's state contains the module atom,
+        # but we store runs by site_id string.
+        spider_name_or_module =
           Map.get(state, :spider_name) ||
             get_spider_name_from_source(item.source_id)
 
-        Logger.debug("EnqueuePipeline: Looking up run for spider_name=#{inspect(spider_name)}")
+        spider_name = normalize_spider_name(spider_name_or_module)
+
+        Logger.debug("EnqueuePipeline: Looking up run for spider_name=#{inspect(spider_name)} (from #{inspect(spider_name_or_module)})")
 
         if spider_name do
           run_id = SpiderRuns.get_current_run_id(spider_name)
@@ -87,6 +90,26 @@ defmodule WebtoonScraper.Pipelines.Enqueue do
 
       run_id ->
         run_id
+    end
+  end
+
+  # Convert spider module atom to site_id string
+  defp normalize_spider_name(nil), do: nil
+
+  defp normalize_spider_name(spider_name) when is_binary(spider_name), do: spider_name
+
+  defp normalize_spider_name(spider_module) when is_atom(spider_module) do
+    # Ensure module is loaded before checking for exported functions
+    Code.ensure_loaded!(spider_module)
+
+    if function_exported?(spider_module, :site_id, 0) do
+      spider_module.site_id()
+    else
+      # Fall back to deriving from module name
+      spider_module
+      |> Module.split()
+      |> List.last()
+      |> Macro.underscore()
     end
   end
 
