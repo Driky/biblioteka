@@ -16,7 +16,7 @@ defmodule WebtoonScraper.Pipelines.Enqueue do
   @impl Crawly.Pipeline
   def run(item, state) do
     case item do
-      %{type: :chapter, images: images} when length(images) > 0 ->
+      %{type: :chapter, images: [_ | _] = _images} ->
         enqueue_chapter_job(item, state)
 
       %{type: :cover} ->
