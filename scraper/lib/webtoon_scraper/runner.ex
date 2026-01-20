@@ -84,6 +84,9 @@ defmodule WebtoonScraper.Runner do
   end
 
   defp get_spider_name(spider_module) do
+    # Ensure module is loaded before checking for exported functions
+    Code.ensure_loaded!(spider_module)
+
     # Extract site_id from spider module
     # e.g., WebtoonScraper.Spiders.MangaHub -> "mangahub"
     if function_exported?(spider_module, :site_id, 0) do
