@@ -44,7 +44,8 @@ defmodule WebtoonScraper.Pipelines.Enqueue do
         Enum.map(item.images, fn img ->
           %{
             url: img.url,
-            headers: img.headers,
+            # Convert header tuples to map for JSON serialization
+            headers: Map.new(img.headers || []),
             sequence: img.sequence
           }
         end),

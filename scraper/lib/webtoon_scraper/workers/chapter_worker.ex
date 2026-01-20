@@ -100,9 +100,10 @@ defmodule WebtoonScraper.Workers.ChapterWorker do
   end
 
   defp download_single_image(%{"url" => url, "headers" => headers, "sequence" => sequence}) do
+    # Headers come from Oban args as a map (JSON deserialized)
     req_headers =
       headers
-      |> Enum.map(fn {k, v} -> {String.downcase(k), v} end)
+      |> Enum.map(fn {k, v} -> {String.downcase(to_string(k)), v} end)
 
     case Req.get(url, headers: req_headers, receive_timeout: 30_000) do
       {:ok, %{status: 200, body: body, headers: resp_headers}} ->
