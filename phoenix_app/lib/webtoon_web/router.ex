@@ -60,13 +60,4 @@ defmodule WebtoonWeb.Router do
 
     live_dashboard "/dashboard", metrics: WebtoonWeb.Telemetry
   end
-
-  # Enable additional dev routes in development
-  if Application.compile_env(:webtoon_web, :dev_routes) do
-    scope "/dev" do
-      pipe_through :browser
-
-      live_dashboard "/dev-dashboard", metrics: WebtoonWeb.Telemetry
-    end
-  end
 end
