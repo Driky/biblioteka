@@ -7,7 +7,7 @@ config :webtoon_scraper,
   ecto_repos: [WebtoonShared.Repo],
   # Maximum number of new chapters to scrape per spider run
   # This prevents overwhelming the target site and request storage
-  max_chapters_per_run: 5
+  max_chapters_per_run: 20
 
 # Oban configuration for async job processing
 config :webtoon_scraper, Oban,
