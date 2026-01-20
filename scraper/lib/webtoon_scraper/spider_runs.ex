@@ -5,6 +5,7 @@ defmodule WebtoonScraper.SpiderRuns do
   Uses RunTracker GenServer for ETS-backed run ID storage.
   """
 
+  require Logger
   import Ecto.Query
 
   alias WebtoonShared.Repo
@@ -18,6 +19,8 @@ defmodule WebtoonScraper.SpiderRuns do
   Returns {:ok, run} or {:error, changeset}.
   """
   def start_run(spider_name, crawl_id \\ nil) do
+    Logger.info("SpiderRuns.start_run called for #{spider_name}")
+
     result =
       %SpiderRun{}
       |> SpiderRun.changeset(%{
@@ -30,14 +33,24 @@ defmodule WebtoonScraper.SpiderRuns do
 
     case result do
       {:ok, run} ->
-        # Store in RunTracker's ETS table
-        WebtoonScraper.RunTracker.store_run(spider_name, run.id)
+        Logger.info("SpiderRun #{run.id} created in database for #{spider_name}")
+
+        # Store in RunTracker's ETS table (with error handling)
+        try do
+          WebtoonScraper.RunTracker.store_run(spider_name, run.id)
+          Logger.debug("Run #{run.id} stored in RunTracker ETS")
+        rescue
+          e ->
+            Logger.error("Failed to store run in RunTracker: #{inspect(e)}")
+        end
+
         # Also update spider config last_run_at
         update_config_last_run(spider_name)
         {:ok, run}
 
-      error ->
-        error
+      {:error, changeset} ->
+        Logger.error("Failed to create spider run: #{inspect(changeset.errors)}")
+        {:error, changeset}
     end
   end
 

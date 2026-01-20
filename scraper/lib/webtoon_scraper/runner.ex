@@ -17,6 +17,7 @@ defmodule WebtoonScraper.Runner do
   """
   def run_spider(spider_module) do
     spider_name = get_spider_name(spider_module)
+    Logger.info("Runner.run_spider called for #{spider_module}, spider_name=#{spider_name}")
 
     # Check if spider is enabled in config
     if not SpiderRuns.spider_enabled?(spider_name) do
@@ -28,6 +29,7 @@ defmodule WebtoonScraper.Runner do
         :skip
       else
         # Create spider run for tracking
+        Logger.info("Creating spider run for #{spider_name}...")
         {:ok, run} = SpiderRuns.start_run(spider_name)
         Logger.info("Created spider run #{run.id} for #{spider_name}")
 
