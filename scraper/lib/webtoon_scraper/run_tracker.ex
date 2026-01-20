@@ -30,7 +30,8 @@ defmodule WebtoonScraper.RunTracker do
   end
 
   def clear_run(spider_name) do
-    GenServer.call(__MODULE__, {:clear_run, spider_name})
+    # Use cast to avoid deadlock when called from within RunTracker
+    GenServer.cast(__MODULE__, {:clear_run, spider_name})
   end
 
   def track_completion(spider_name, spider_module) do
@@ -56,9 +57,9 @@ defmodule WebtoonScraper.RunTracker do
   end
 
   @impl true
-  def handle_call({:clear_run, spider_name}, _from, state) do
+  def handle_cast({:clear_run, spider_name}, state) do
     :ets.delete(@ets_table, spider_name)
-    {:reply, :ok, state}
+    {:noreply, state}
   end
 
   @impl true
@@ -108,8 +109,8 @@ defmodule WebtoonScraper.RunTracker do
       {spider_name, run_id, spider_module} when not is_nil(spider_module) ->
         if spider_module not in running_spider_modules do
           Logger.info("RunTracker: Spider #{spider_name} (#{spider_module}) finished, completing run #{run_id}")
+          # complete_run will call clear_run which handles ETS deletion
           WebtoonScraper.SpiderRuns.complete_run(spider_name, "completed")
-          :ets.delete(@ets_table, spider_name)
         else
           Logger.debug("RunTracker: Spider #{spider_name} still running")
         end
