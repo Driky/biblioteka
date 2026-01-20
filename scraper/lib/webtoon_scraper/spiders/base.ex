@@ -142,8 +142,10 @@ defmodule WebtoonScraper.Spiders.Base do
         end
 
         # Generate requests for new chapter pages
+        # Reverse the list so that when Crawly processes LIFO, smallest chapters are handled first
         requests =
-          Enum.map(new_chapters, fn ch ->
+          new_chapters
+          |> Enum.map(fn ch ->
             request = Crawly.Utils.request_from_url(ch.url)
 
             # Store chapter metadata in the options field
@@ -160,6 +162,7 @@ defmodule WebtoonScraper.Spiders.Base do
 
             %{request | options: chapter_options}
           end)
+          |> Enum.reverse()
 
         # Include cover item if we found one and webtoon doesn't have a cover yet
         items = if cover_item, do: [cover_item], else: []
