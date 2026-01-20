@@ -57,8 +57,9 @@ defmodule WebtoonWeb.MixProject do
       # Environment variables from .env files
       {:dotenvy, "~> 0.8"},
 
-      # Oban for job monitoring in LiveDashboard
-      {:oban, "~> 2.18"}
+      # Oban Web for job monitoring dashboard
+      {:oban, "~> 2.18"},
+      {:oban_web, "~> 2.10"}
     ]
   end
 
