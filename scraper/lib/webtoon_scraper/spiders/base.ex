@@ -136,6 +136,18 @@ defmodule WebtoonScraper.Spiders.Base do
           "#{length(new_chapters)} new chapters to scrape (max #{max_chapters} per run): [#{chapter_numbers}]"
         )
 
+        # Update chapters_found in the spider run record
+        if length(new_chapters) > 0 do
+          case WebtoonScraper.SpiderRuns.get_current_run_id(site_id()) do
+            nil ->
+              Logger.warning("No active run found for #{site_id()}, cannot update chapters_found")
+
+            run_id ->
+              WebtoonScraper.SpiderRuns.update_chapters_found(run_id, length(new_chapters))
+              Logger.debug("Updated chapters_found=#{length(new_chapters)} for run #{run_id}")
+          end
+        end
+
         # Mark source as checked even if no new chapters
         if Enum.empty?(new_chapters) do
           WebtoonScraper.Sources.touch_last_checked(source.id)
@@ -160,9 +172,14 @@ defmodule WebtoonScraper.Spiders.Base do
               scroll: true
             ]
 
+            Logger.debug("Creating request for chapter #{ch.chapter_number}: #{ch.url}")
             %{request | options: chapter_options}
           end)
-          |> Enum.reverse()
+
+        # Log the request order before and after reverse
+        Logger.info("Request order before reverse: #{requests |> Enum.map(&Keyword.get(&1.options, :chapter_number)) |> Enum.map(&Decimal.to_string/1) |> Enum.join(", ")}")
+        requests = Enum.reverse(requests)
+        Logger.info("Request order after reverse (Crawly LIFO will process last first): #{requests |> Enum.map(&Keyword.get(&1.options, :chapter_number)) |> Enum.map(&Decimal.to_string/1) |> Enum.join(", ")}")
 
         # Include cover item if we found one and webtoon doesn't have a cover yet
         items = if cover_item, do: [cover_item], else: []
@@ -215,6 +232,7 @@ defmodule WebtoonScraper.Spiders.Base do
 
       defp parse_chapter_page(response) do
         url = response.request_url || ""
+        Logger.info(">>> parse_chapter_page called for URL: #{url}")
 
         # Try to get options from response.request first (standard Crawly way)
         # Fall back to ETS if not available
@@ -229,6 +247,7 @@ defmodule WebtoonScraper.Spiders.Base do
 
         # Extract chapter metadata from options
         chapter_number = Keyword.get(opts, :chapter_number) || extract_chapter_number_from_url(url)
+        Logger.info(">>> Processing chapter #{inspect(chapter_number)} from URL: #{url}")
         chapter_title = Keyword.get(opts, :chapter_title)
         source_id = Keyword.get(opts, :source_id)
         webtoon_id = Keyword.get(opts, :webtoon_id)
@@ -284,6 +303,7 @@ defmodule WebtoonScraper.Spiders.Base do
           images: images
         }
 
+        Logger.info(">>> Returning ParsedItem for chapter #{chapter_number} with #{length(images)} images")
         %Crawly.ParsedItem{items: [item], requests: []}
       end
 

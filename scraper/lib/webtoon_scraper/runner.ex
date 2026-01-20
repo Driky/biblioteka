@@ -43,12 +43,16 @@ defmodule WebtoonScraper.Runner do
         case Crawly.Engine.start_spider(spider_module) do
           :ok ->
             Logger.info("#{spider_module} started successfully")
+            # Get crawl_id from Crawly and update the run
+            update_run_crawl_id(spider_module, run.id)
             # Register with RunTracker for automatic completion detection
             RunTracker.track_completion(spider_name, spider_module)
             :ok
 
           {:ok, _pid} ->
             Logger.info("#{spider_module} started successfully")
+            # Get crawl_id from Crawly and update the run
+            update_run_crawl_id(spider_module, run.id)
             # Register with RunTracker for automatic completion detection
             RunTracker.track_completion(spider_name, spider_module)
             :ok
@@ -105,6 +109,19 @@ defmodule WebtoonScraper.Runner do
       |> Module.split()
       |> List.last()
       |> Macro.underscore()
+    end
+  end
+
+  defp update_run_crawl_id(spider_module, run_id) do
+    # Crawly.Engine.running_spiders() returns %{SpiderModule => {pid, crawl_id}}
+    case Map.get(running_spiders(), spider_module) do
+      {_pid, crawl_id} when not is_nil(crawl_id) ->
+        Logger.info("Updating run #{run_id} with crawl_id=#{crawl_id}")
+        SpiderRuns.update_crawl_id(run_id, crawl_id)
+
+      _ ->
+        Logger.warning("Could not get crawl_id for #{spider_module}")
+        :ok
     end
   end
 end

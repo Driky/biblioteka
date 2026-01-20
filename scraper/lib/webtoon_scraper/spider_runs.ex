@@ -62,6 +62,18 @@ defmodule WebtoonScraper.SpiderRuns do
   end
 
   @doc """
+  Updates the crawl_id for a run (set after Crawly assigns it).
+  """
+  def update_crawl_id(run_id, crawl_id) do
+    SpiderRun
+    |> Repo.get(run_id)
+    |> case do
+      nil -> {:error, :not_found}
+      run -> run |> SpiderRun.changeset(%{crawl_id: crawl_id}) |> Repo.update()
+    end
+  end
+
+  @doc """
   Updates the chapters_found count for a run.
   """
   def update_chapters_found(run_id, count) do

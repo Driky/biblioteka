@@ -15,15 +15,19 @@ defmodule WebtoonScraper.Pipelines.Enqueue do
 
   @impl Crawly.Pipeline
   def run(item, state) do
+    Logger.info(">>> EnqueuePipeline.run called with item type: #{inspect(item[:type])}, chapter: #{inspect(item[:chapter_number])}")
+
     case item do
       %{type: :chapter, images: [_ | _] = _images} ->
         enqueue_chapter_job(item, state)
 
       %{type: :cover} ->
         # Keep cover processing synchronous (it's just one image)
+        Logger.debug("EnqueuePipeline: passing cover item through")
         {item, state}
 
       _ ->
+        Logger.debug("EnqueuePipeline: passing unknown item type through")
         {item, state}
     end
   end
