@@ -51,6 +51,7 @@ defmodule WebtoonScraper.RunTracker do
   @impl true
   def handle_call({:store_run, spider_name, run_id}, _from, state) do
     :ets.insert(@ets_table, {spider_name, run_id, nil})
+    Logger.info("RunTracker: Stored run #{run_id} for #{spider_name}")
     {:reply, :ok, state}
   end
 
@@ -63,15 +64,19 @@ defmodule WebtoonScraper.RunTracker do
   @impl true
   def handle_cast({:track_completion, spider_name, spider_module}, state) do
     # Update the entry to include the spider module for completion tracking
+    Logger.info("RunTracker: Registering completion tracking for #{spider_name} (#{spider_module})")
+
     case :ets.lookup(@ets_table, spider_name) do
       [{^spider_name, run_id, _}] ->
         :ets.insert(@ets_table, {spider_name, run_id, spider_module})
+        Logger.info("RunTracker: Updated entry with spider_module for run #{run_id}")
 
       [{^spider_name, run_id}] ->
         :ets.insert(@ets_table, {spider_name, run_id, spider_module})
+        Logger.info("RunTracker: Updated entry with spider_module for run #{run_id}")
 
       [] ->
-        :ok
+        Logger.warning("RunTracker: No entry found for #{spider_name}, cannot track completion")
     end
 
     {:noreply, state}
@@ -90,15 +95,25 @@ defmodule WebtoonScraper.RunTracker do
 
   defp check_all_completions do
     running_spiders = Crawly.Engine.running_spiders()
+    tracked_runs = :ets.tab2list(@ets_table)
 
-    :ets.tab2list(@ets_table)
+    if length(tracked_runs) > 0 do
+      Logger.debug("RunTracker: Checking #{length(tracked_runs)} tracked runs, running_spiders=#{inspect(running_spiders)}")
+    end
+
+    tracked_runs
     |> Enum.each(fn
-      {spider_name, _run_id, spider_module} when not is_nil(spider_module) ->
+      {spider_name, run_id, spider_module} when not is_nil(spider_module) ->
         if spider_module not in running_spiders do
-          Logger.info("RunTracker: Spider #{spider_name} finished, completing run")
+          Logger.info("RunTracker: Spider #{spider_name} (#{spider_module}) finished, completing run #{run_id}")
           WebtoonScraper.SpiderRuns.complete_run(spider_name, "completed")
           :ets.delete(@ets_table, spider_name)
+        else
+          Logger.debug("RunTracker: Spider #{spider_name} still running")
         end
+
+      {spider_name, run_id, nil} ->
+        Logger.debug("RunTracker: Run #{run_id} for #{spider_name} has no spider_module set, skipping completion check")
 
       _ ->
         :ok

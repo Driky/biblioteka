@@ -74,9 +74,14 @@ defmodule WebtoonScraper.Pipelines.Enqueue do
           Map.get(state, :spider_name) ||
             get_spider_name_from_source(item.source_id)
 
+        Logger.debug("EnqueuePipeline: Looking up run for spider_name=#{inspect(spider_name)}")
+
         if spider_name do
-          SpiderRuns.get_current_run_id(spider_name)
+          run_id = SpiderRuns.get_current_run_id(spider_name)
+          Logger.debug("EnqueuePipeline: Found run_id=#{inspect(run_id)} for #{spider_name}")
+          run_id
         else
+          Logger.warning("EnqueuePipeline: Could not determine spider_name, no run tracking")
           nil
         end
 
