@@ -100,14 +100,16 @@ defmodule Webtoon.Admin do
       |> where([c], c.webtoon_id == ^webtoon_id)
       |> Repo.aggregate(:count)
 
+    # Count chapters that have at least one image using distinct
     chapters_with_images =
       from(c in Chapter,
         where: c.webtoon_id == ^webtoon_id,
         join: i in assoc(c, :images),
-        group_by: c.id,
+        distinct: true,
         select: c.id
       )
-      |> Repo.aggregate(:count)
+      |> Repo.all()
+      |> length()
 
     chapters_missing_title =
       Chapter
