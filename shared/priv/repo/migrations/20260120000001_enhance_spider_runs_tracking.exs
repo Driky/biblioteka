@@ -21,7 +21,7 @@ defmodule WebtoonShared.Repo.Migrations.EnhanceSpiderRunsTracking do
       add :last_error, :text
     end
 
-    # Add index for finding runs by status
-    create index(:spider_runs, [:status])
+    # Add index for finding runs by status (if not exists)
+    create_if_not_exists index(:spider_runs, [:status])
   end
 end
