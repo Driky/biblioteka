@@ -43,9 +43,19 @@ defmodule WebtoonWeb.HomeLive do
   end
 
   defp webtoon_card(assigns) do
+    # If user has progress, link directly to their last chapter; otherwise link to webtoon page
+    navigate_to =
+      if assigns.progress do
+        ~p"/webtoons/#{assigns.webtoon.slug}/chapters/#{format_chapter_number(assigns.progress.last_chapter.chapter_number)}"
+      else
+        ~p"/webtoons/#{assigns.webtoon.slug}"
+      end
+
+    assigns = assign(assigns, :navigate_to, navigate_to)
+
     ~H"""
     <.link
-      navigate={~p"/webtoons/#{@webtoon.slug}"}
+      navigate={@navigate_to}
       class="group block bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow"
     >
       <div class="aspect-[3/4] bg-gray-200 relative">
@@ -79,12 +89,9 @@ defmodule WebtoonWeb.HomeLive do
         </p>
 
         <div :if={@progress} class="mt-2">
-          <.link
-            navigate={~p"/webtoons/#{@webtoon.slug}/chapters/#{format_chapter_number(@progress.last_chapter.chapter_number)}"}
-            class="text-sm text-blue-600 hover:text-blue-800"
-          >
+          <span class="text-sm text-blue-600 group-hover:text-blue-800">
             Continue Reading
-          </.link>
+          </span>
         </div>
       </div>
     </.link>

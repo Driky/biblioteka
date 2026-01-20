@@ -16,8 +16,10 @@ defmodule WebtoonScraper.Pipelines.DatabaseSave do
   @impl Crawly.Pipeline
   def run(item, state) do
     case item do
+      # Chapters are handled asynchronously by Oban ChapterWorker
+      # Skip them in the sync pipeline
       %{type: :chapter} ->
-        save_chapter(item, state)
+        {item, state}
 
       %{type: :cover} ->
         save_cover(item, state)

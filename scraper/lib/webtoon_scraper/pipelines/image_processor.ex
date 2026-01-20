@@ -11,8 +11,10 @@ defmodule WebtoonScraper.Pipelines.ImageProcessor do
   @impl Crawly.Pipeline
   def run(item, state) do
     case item do
-      %{type: :chapter, images: images} ->
-        process_chapter_images(item, images, state)
+      # Chapters are handled asynchronously by Oban ChapterWorker
+      # Skip them in the sync pipeline
+      %{type: :chapter} ->
+        {item, state}
 
       %{type: :cover, url: url, headers: headers} ->
         process_cover_image(item, url, headers, state)

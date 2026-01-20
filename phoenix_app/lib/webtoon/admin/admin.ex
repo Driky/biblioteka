@@ -156,6 +156,15 @@ defmodule Webtoon.Admin do
     |> Repo.update_all(set: Map.to_list(updates))
   end
 
+  def mark_chapters_without_title_for_rescrape(webtoon_id) do
+    {count, _} =
+      Chapter
+      |> where([c], c.webtoon_id == ^webtoon_id and is_nil(c.title))
+      |> Repo.update_all(set: [needs_title_rescrape: true])
+
+    count
+  end
+
   def toggle_source_crawl(source_id, enabled) do
     source = Repo.get!(WebtoonSource, source_id)
 

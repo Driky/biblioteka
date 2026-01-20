@@ -13,13 +13,10 @@ defmodule WebtoonScraper.Pipelines.R2Upload do
   @impl Crawly.Pipeline
   def run(item, state) do
     case item do
-      %{type: :chapter, images: images, webtoon_slug: slug, chapter_number: chapter_num}
-      when is_binary(slug) ->
-        upload_chapter_images(item, images, slug, chapter_num, state)
-
-      %{type: :chapter, webtoon_slug: nil} ->
-        Logger.error("Cannot upload images: webtoon_slug is nil")
-        {false, state}
+      # Chapters are handled asynchronously by Oban ChapterWorker
+      # Skip them in the sync pipeline
+      %{type: :chapter} ->
+        {item, state}
 
       %{type: :cover, binary: binary, webtoon_slug: slug, extension: ext, content_type: content_type}
       when is_binary(slug) and is_binary(binary) ->

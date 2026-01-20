@@ -101,6 +101,21 @@ defmodule WebtoonWeb.Admin.WebtoonLive.Show do
   end
 
   @impl true
+  def handle_event("mark_missing_titles_for_rescrape", _, socket) do
+    count = Admin.mark_chapters_without_title_for_rescrape(socket.assigns.webtoon.id)
+
+    # Refresh chapters and stats
+    chapters = Admin.get_webtoon_chapters(socket.assigns.webtoon.id, filter: socket.assigns.filter)
+    stats = Admin.get_webtoon_stats(socket.assigns.webtoon.id)
+
+    {:noreply,
+     socket
+     |> assign(:chapters, chapters)
+     |> assign(:stats, stats)
+     |> put_flash(:info, "#{count} chapters without title marked for rescrape")}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <div>
@@ -130,6 +145,13 @@ defmodule WebtoonWeb.Admin.WebtoonLive.Show do
         <div class="bg-white rounded-lg shadow p-4">
           <p class="text-sm text-gray-500">Missing Titles</p>
           <p class="text-2xl font-semibold text-orange-600">{@stats.chapters_missing_title}</p>
+          <button
+            :if={@stats.chapters_missing_title > 0}
+            phx-click="mark_missing_titles_for_rescrape"
+            class="mt-2 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded hover:bg-orange-200"
+          >
+            Mark all for rescrape
+          </button>
         </div>
       </div>
 
