@@ -43,6 +43,10 @@ config :crawly,
   # Increase manager timeout for storing many requests
   manager_operations_timeout: 30_000,
 
+  # Wait 3 minutes after spider becomes idle before shutting down
+  # This ensures in-flight HTTP requests have time to complete
+  closespider_timeout: 180_000,
+
   # Note: Retries are handled by our custom RenderServer fetcher
   # to avoid conflicts with Crawly's request deduplication
 
