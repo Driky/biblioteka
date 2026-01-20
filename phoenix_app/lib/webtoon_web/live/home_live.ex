@@ -62,7 +62,9 @@ defmodule WebtoonWeb.HomeLive do
         navigate={~p"/webtoons/#{@webtoon.slug}"}
         class="absolute inset-0 z-0"
         aria-label={"View #{@webtoon.title}"}
-      />
+      >
+        <span class="sr-only">View {@webtoon.title}</span>
+      </.link>
 
       <%!-- Visual content - pointer-events-none so clicks pass through to main link --%>
       <div class="relative z-10 pointer-events-none">
