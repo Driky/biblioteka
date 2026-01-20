@@ -40,7 +40,7 @@ defmodule WebtoonScraper.Workers.ChapterWorker do
     chapter_number = Decimal.new(chapter_number_str)
 
     Logger.info(
-      "ChapterWorker processing chapter #{chapter_number_str} with #{length(images)} images"
+      "ChapterWorker processing chapter #{chapter_number_str} with #{length(images)} images, spider_run_id=#{inspect(spider_run_id)}"
     )
 
     with {:ok, processed_images} <- download_images(images),
@@ -57,7 +57,10 @@ defmodule WebtoonScraper.Workers.ChapterWorker do
            ) do
       # Update spider run stats if tracking
       if spider_run_id do
+        Logger.info("ChapterWorker updating stats for run #{spider_run_id}: +1 chapter, +#{length(uploaded_images)} images")
         update_spider_run_stats(spider_run_id, length(uploaded_images))
+      else
+        Logger.debug("ChapterWorker: No spider_run_id, skipping stats update")
       end
 
       Logger.info("ChapterWorker completed chapter #{chapter_number_str}")
